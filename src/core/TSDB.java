@@ -62,11 +62,11 @@ public final class TSDB {
   final byte[] table;
 
   /** Unique IDs for the metric names. */
-  final UniqueId metrics;
+  final public UniqueId metrics;
   /** Unique IDs for the tag names. */
-  final UniqueId tag_names;
+  final public UniqueId tag_names;
   /** Unique IDs for the tag values. */
-  final UniqueId tag_values;
+  final public UniqueId tag_values;
 
   /**
    * Row keys that need to be compacted.

@@ -89,6 +89,9 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
     telnet_commands.put("exit", new Exit());
     telnet_commands.put("help", new Help());
     telnet_commands.put("put", new PutDataPointRpc());
+    telnet_commands.put("tagk", new GetNewTagKeyId());
+    telnet_commands.put("tagv", new GetNewTagValueId());
+    telnet_commands.put("metric", new GetNewMetricId());
 
     http_commands.put("", new HomePage());
     http_commands.put("aggregators", new ListAggregators());
@@ -405,38 +408,80 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
 
   /** The "version" command. */
   private static final class Version implements TelnetRpc, HttpRpc {
+	  public Deferred<Object> execute(final TSDB tsdb, final Channel chan,
+			  final String[] cmd) {
+		  if (chan.isConnected()) {
+			  chan.write(BuildData.revisionString() + '\n'
+					  + BuildData.buildString() + '\n');
+		  }
+		  return Deferred.fromResult(null);
+	  }
+	  
+	  public void execute(final TSDB tsdb, final HttpQuery query) {
+		  final boolean json = query.request().getUri().endsWith("json");
+		  StringBuilder buf;
+		  if (json) {
+			  buf = new StringBuilder(157 + BuildData.repo_status.toString().length()
+					  + BuildData.user.length() + BuildData.host.length()
+					  + BuildData.repo.length());
+			  buf.append("{\"short_revision\":\"").append(BuildData.short_revision)
+			  .append("\",\"full_revision\":\"").append(BuildData.full_revision)
+			  .append("\",\"timestamp\":").append(BuildData.timestamp)
+			  .append(",\"repo_status\":\"").append(BuildData.repo_status)
+			  .append("\",\"user\":\"").append(BuildData.user)
+			  .append("\",\"host\":\"").append(BuildData.host)
+			  .append("\",\"repo\":\"").append(BuildData.repo)
+			  .append("\"}");
+		  } else {
+			  final String revision = BuildData.revisionString();
+			  final String build = BuildData.buildString();
+			  buf = new StringBuilder(2 // For the \n's
+					  + revision.length() + build.length());
+			  buf.append(revision).append('\n').append(build).append('\n');
+		  }
+		  query.sendReply(buf);
+	  }
+  }
+ 
+  /** The "tagk" command. */
+  private static final class GetNewTagKeyId implements TelnetRpc {
+	  public Deferred<Object> execute(final TSDB tsdb, final Channel chan,
+			  final String[] cmd) {
+		  if (chan.isConnected()) {   
+			  logWarn(chan, "tag key command : " + Arrays.toString(cmd));
+			  if (cmd.length == 2) {
+				  chan.write(tsdb.tag_names.getOrCreateId(cmd[1]).toString() + '\n');
+			  }
+		  }
+		  return Deferred.fromResult(null);
+	  }
+  }
+  
+  /** The "tagv" command. */
+  private static final class GetNewTagValueId implements TelnetRpc {
+	  public Deferred<Object> execute(final TSDB tsdb, final Channel chan,
+			  final String[] cmd) {
+		  if (chan.isConnected()) {   
+			  logWarn(chan, "tag value command : " + Arrays.toString(cmd));
+			  if (cmd.length == 2) {
+				  chan.write(tsdb.tag_values.getOrCreateId(cmd[1]).toString() + '\n');
+			  }
+		  }
+		  return Deferred.fromResult(null);
+	  }
+  }
+  
+  /** The "metric" command. */
+  private static final class GetNewMetricId implements TelnetRpc {
     public Deferred<Object> execute(final TSDB tsdb, final Channel chan,
                                     final String[] cmd) {
-      if (chan.isConnected()) {
-        chan.write(BuildData.revisionString() + '\n'
-                   + BuildData.buildString() + '\n');
+      if (chan.isConnected()) {   
+    	  logWarn(chan, "metric command : " + Arrays.toString(cmd));
+    	  if (cmd.length == 2) {
+    		  chan.write(tsdb.metrics.getOrCreateId(cmd[1]).toString() + '\n');
+    	  }
       }
       return Deferred.fromResult(null);
-    }
-
-    public void execute(final TSDB tsdb, final HttpQuery query) {
-      final boolean json = query.request().getUri().endsWith("json");
-      StringBuilder buf;
-      if (json) {
-        buf = new StringBuilder(157 + BuildData.repo_status.toString().length()
-                                + BuildData.user.length() + BuildData.host.length()
-                                + BuildData.repo.length());
-        buf.append("{\"short_revision\":\"").append(BuildData.short_revision)
-          .append("\",\"full_revision\":\"").append(BuildData.full_revision)
-          .append("\",\"timestamp\":").append(BuildData.timestamp)
-          .append(",\"repo_status\":\"").append(BuildData.repo_status)
-          .append("\",\"user\":\"").append(BuildData.user)
-          .append("\",\"host\":\"").append(BuildData.host)
-          .append("\",\"repo\":\"").append(BuildData.repo)
-          .append("\"}");
-      } else {
-        final String revision = BuildData.revisionString();
-        final String build = BuildData.buildString();
-        buf = new StringBuilder(2 // For the \n's
-                                + revision.length() + build.length());
-        buf.append(revision).append('\n').append(build).append('\n');
-      }
-      query.sendReply(buf);
     }
   }
 
