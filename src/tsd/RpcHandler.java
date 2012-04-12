@@ -12,6 +12,7 @@
 // see <http://www.gnu.org/licenses/>.
 package net.opentsdb.tsd;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -450,7 +451,7 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
 		  if (chan.isConnected()) {   
 			  logWarn(chan, "tag key command : " + Arrays.toString(cmd));
 			  if (cmd.length == 2) {
-				  chan.write(tsdb.tag_names.getOrCreateId(cmd[1]).toString() + '\n');
+				  chan.write(fromBytes(tsdb.tag_names.getOrCreateId(cmd[1])) + '\n');
 			  }
 		  }
 		  return Deferred.fromResult(null);
@@ -464,7 +465,7 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
 		  if (chan.isConnected()) {   
 			  logWarn(chan, "tag value command : " + Arrays.toString(cmd));
 			  if (cmd.length == 2) {
-				  chan.write(tsdb.tag_values.getOrCreateId(cmd[1]).toString() + '\n');
+				  chan.write(fromBytes(tsdb.tag_values.getOrCreateId(cmd[1])) + '\n');
 			  }
 		  }
 		  return Deferred.fromResult(null);
@@ -478,7 +479,7 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
       if (chan.isConnected()) {   
     	  logWarn(chan, "metric command : " + Arrays.toString(cmd));
     	  if (cmd.length == 2) {
-    		  chan.write(tsdb.metrics.getOrCreateId(cmd[1]).toString() + '\n');
+    		  chan.write(fromBytes(tsdb.metrics.getOrCreateId(cmd[1])) + '\n');
     	  }
       }
       return Deferred.fromResult(null);
@@ -506,6 +507,12 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
       throw new IllegalStateException("System property `" + prop + err);
     }
     return dir;
+  }
+  
+  private static final Charset CHARSET = Charset.forName("ISO-8859-1");
+  
+  private static String fromBytes(final byte[] b) {
+	return new String(b, CHARSET);
   }
 
   // ---------------- //
