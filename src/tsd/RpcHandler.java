@@ -451,7 +451,7 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
 		  if (chan.isConnected()) {   
 			  logWarn(chan, "tag key command : " + Arrays.toString(cmd));
 			  if (cmd.length == 2) {
-				  chan.write(fromBytes(tsdb.tag_names.getOrCreateId(cmd[1])) + '\n');
+				  chan.write(Arrays.toString(tsdb.tag_names.getOrCreateId(cmd[1])));
 			  }
 		  }
 		  return Deferred.fromResult(null);
@@ -465,7 +465,7 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
 		  if (chan.isConnected()) {   
 			  logWarn(chan, "tag value command : " + Arrays.toString(cmd));
 			  if (cmd.length == 2) {
-				  chan.write(fromBytes(tsdb.tag_values.getOrCreateId(cmd[1])) + '\n');
+				  chan.write(Arrays.toString((tsdb.tag_values.getOrCreateId(cmd[1]))));
 			  }
 		  }
 		  return Deferred.fromResult(null);
@@ -479,7 +479,7 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
       if (chan.isConnected()) {   
     	  logWarn(chan, "metric command : " + Arrays.toString(cmd));
     	  if (cmd.length == 2) {
-    		  chan.write(fromBytes(tsdb.metrics.getOrCreateId(cmd[1])) + '\n');
+    		  chan.write(Arrays.toString(tsdb.metrics.getOrCreateId(cmd[1])));
     	  }
       }
       return Deferred.fromResult(null);
