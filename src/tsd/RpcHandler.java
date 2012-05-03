@@ -92,7 +92,7 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
     telnet_commands.put("put", new PutDataPointRpc());
     telnet_commands.put("tagk", new GetNewTagKeyId());
     telnet_commands.put("tagv", new GetNewTagValueId());
-    telnet_commands.put("metric", new GetNewMetricId());
+    telnet_commands.put("metrics", new GetNewMetricId());
 
     http_commands.put("", new HomePage());
     http_commands.put("aggregators", new ListAggregators());
