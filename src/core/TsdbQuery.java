@@ -17,9 +17,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
+import java.lang.Boolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,6 +112,8 @@ final class TsdbQuery implements Query {
 
   /** Minimum time interval (in seconds) wanted between each data point. */
   private int sample_interval;
+  
+  private Map<byte[], Boolean> aggregate_tag = new HashMap<byte[], Boolean>();
 
   /** Constructor. */
   public TsdbQuery(final TSDB tsdb) {
@@ -195,18 +199,26 @@ final class TsdbQuery implements Query {
       final Map.Entry<String, String> tag = i.next();
       final String tagvalue = tag.getValue();
       if (tagvalue.equals("*")  // 'GROUP BY' with any value.
-          || tagvalue.indexOf('|', 1) >= 0) {  // Multiple possible values.
+          || tagvalue.indexOf('|', 1) >= 0 || tagvalue.indexOf(' ', 1) >= 0) {  // Multiple possible values.
         if (group_bys == null) {
           group_bys = new ArrayList<byte[]>();
         }
-        group_bys.add(tsdb.tag_names.getId(tag.getKey()));
+        byte[] tag_id = tsdb.tag_names.getId(tag.getKey());
+        group_bys.add(tag_id);
         i.remove();
         if (tagvalue.charAt(0) == '*') {
           continue;  // For a 'GROUP BY' with any value, we're done.
         }
         // 'GROUP BY' with specific values.  Need to split the values
         // to group on and store their IDs in group_by_values.
-        final String[] values = Tags.splitString(tagvalue, '|');
+        String[] values = null;
+        if (tagvalue.indexOf('|', 1) >= 0) {
+        	values = Tags.splitString(tagvalue, '|');
+        	aggregate_tag.put(tag_id, Boolean.FALSE);
+        } else {
+        	values = Tags.splitString(tagvalue, ' ');
+        	aggregate_tag.put(tag_id, Boolean.TRUE);
+        }
         if (group_by_values == null) {
           group_by_values = new ByteMap<byte[][]>();
         }
@@ -326,7 +338,12 @@ final class TsdbQuery implements Query {
       // TODO(tsuna): The following loop has a quadratic behavior.  We can
       // make it much better since both the row key and group_bys are sorted.
       for (final byte[] tag_id : group_bys) {
-        value_id = Tags.getValueId(tsdb, row, tag_id);
+    	Boolean is_aggregate = aggregate_tag.get(tag_id);
+    	if (is_aggregate != null && is_aggregate) {
+    		value_id = tag_id;
+    	} else {
+    		value_id = Tags.getValueId(tsdb, row, tag_id);
+    	}
         if (value_id == null) {
           break;
         }
