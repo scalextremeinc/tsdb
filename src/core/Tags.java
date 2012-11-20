@@ -289,7 +289,8 @@ public final class Tags {
       if (!(('a' <= c && c <= 'z')
             || ('A' <= c && c <= 'Z')
             || ('0' <= c && c <= '9')
-            || c == '-' || c == '_' || c == '.' || c == '/')) {
+            || c == '-' || c == '_' || c == '.' || c == '/'
+            || c == '[' || c == ']' || c == ',')) {
         throw new IllegalArgumentException("Invalid " + what
             + " (\"" + s + "\"): illegal character: " + c);
       }
