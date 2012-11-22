@@ -839,7 +839,13 @@ final class GraphHandler implements HttpRpc {
       final Aggregator agg = getAggregator(parts[0]);
       i--;  // Move to the last part (the metric name).
       final HashMap<String, String> parsedtags = new HashMap<String, String>();
-      final String metric = Tags.parseWithMetric(parts[i], parsedtags);
+      String metric = Tags.parseWithMetric(parts[i], parsedtags);
+      try {
+    	  metric = java.net.URLDecoder.decode(metric, "UTF-8");
+      } catch (java.io.UnsupportedEncodingException e) {
+    	  throw new BadRequestException("Unable to decode metric: " + metric 
+    			  + ", error: " + e.getMessage());
+      }
       final boolean rate = "rate".equals(parts[--i]);
       if (rate) {
         i--;  // Move to the next part.

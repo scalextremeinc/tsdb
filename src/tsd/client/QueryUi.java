@@ -286,6 +286,7 @@ public class QueryUi implements EntryPoint {
           public void onMetricChange(final MetricForm metric) {
             final int index = metrics.getWidgetIndex(metric);
             metrics.getTabBar().setTabText(index, getTabTitle(metric));
+            // here update doupe encoded label
           }
           private String getTabTitle(final MetricForm metric) {
             final String metrictext = metric.getMetric();

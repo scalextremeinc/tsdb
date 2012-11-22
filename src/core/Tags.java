@@ -283,6 +283,7 @@ public final class Tags {
     if (s == null) {
       throw new IllegalArgumentException("Invalid " + what + ": null");
     }
+    /*
     final int n = s.length();
     for (int i = 0; i < n; i++) {
       final char c = s.charAt(i);
@@ -295,6 +296,7 @@ public final class Tags {
             + " (\"" + s + "\"): illegal character: " + c);
       }
     }
+    */
   }
 
   /**

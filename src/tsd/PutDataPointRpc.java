@@ -97,7 +97,13 @@ final class PutDataPointRpc implements TelnetRpc {
       throw new IllegalArgumentException("not enough arguments"
                                          + " (need least 4, got " + (words.length - 1) + ')');
     }
-    final String metric = words[1];
+    String metric = words[1];
+  	try {
+  	  metric = java.net.URLDecoder.decode(metric, "UTF-8");
+    } catch (java.io.UnsupportedEncodingException e) {
+  	  throw new IllegalArgumentException("Unable to decode metric: " + metric 
+  			  + ", error: " + e.getMessage());
+    }
     if (metric.length() <= 0) {
       throw new IllegalArgumentException("empty metric name");
     }

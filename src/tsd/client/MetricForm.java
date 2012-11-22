@@ -30,6 +30,7 @@ import com.google.gwt.user.client.ui.ListBox;
 import com.google.gwt.user.client.ui.SuggestBox;
 import com.google.gwt.user.client.ui.VerticalPanel;
 import com.google.gwt.user.client.ui.Widget;
+import com.google.gwt.user.client.ui.Label;
 
 final class MetricForm extends HorizontalPanel implements Focusable {
 
@@ -37,7 +38,7 @@ final class MetricForm extends HorizontalPanel implements Focusable {
     void onMetricChange(MetricForm widget);
   }
 
-  private static final String TSDB_ID_CLASS = "[-_./a-zA-Z0-9\\[\\],]";
+  private static final String TSDB_ID_CLASS = ".";
   private static final String TSDB_ID_RE = "^" + TSDB_ID_CLASS + "*$";
   private static final String TSDB_TAGVALUE_RE =
     "^(\\*?"                                       // a `*' wildcard or nothing
@@ -54,6 +55,7 @@ final class MetricForm extends HorizontalPanel implements Focusable {
   private final ListBox aggregators = new ListBox();
   private final ValidatedTextBox metric = new ValidatedTextBox();
   private final FlexTable tagtable = new FlexTable();
+  private final Label encodestatus = new Label();
 
   public MetricForm(final EventsHandler handler) {
     events_handler = handler;
@@ -104,8 +106,13 @@ final class MetricForm extends HorizontalPanel implements Focusable {
       hbox.add(suggest);
       hbox.setWidth("100%");
       metric.setWidth("100%");
-
-      tagtable.setWidget(0, 0, hbox);
+      
+      final VerticalPanel vbox = new VerticalPanel();
+      vbox.add(hbox);
+      vbox.add(encodestatus);
+      
+      tagtable.setWidget(0, 0, vbox);
+      
       tagtable.getFlexCellFormatter().setColSpan(0, 0, 3);
       addTag(null);
       tagtable.setText(1, 0, "Tags");
@@ -152,7 +159,7 @@ final class MetricForm extends HorizontalPanel implements Focusable {
   }
 
   public boolean buildQueryString(final StringBuilder url) {
-    final String metric = getMetric();
+    String metric = getMetric();
     if (metric.isEmpty()) {
       return false;
     }
@@ -165,6 +172,8 @@ final class MetricForm extends HorizontalPanel implements Focusable {
     if (rate.getValue()) {
       url.append(":rate");
     }
+	metric = encodeMetric(metric);
+	encodestatus.setText(metric);
     url.append(':').append(metric);
     {
       final int ntags = getNumTags();
@@ -369,6 +378,18 @@ final class MetricForm extends HorizontalPanel implements Focusable {
 
   public void setFocus(final boolean focused) {
     metric.setFocus(focused);
+  }
+  
+  public static String encodeMetric(String str) {
+	  str = com.google.gwt.http.client.URL.encodeQueryString(str);
+	  str = str.replace("!", "%21");
+	  str = str.replace("~", "%7E");
+	  str = str.replace("*", "%2A");
+	  str = str.replace("'", "%27");
+	  str = str.replace("(", "%28");
+	  str = str.replace(")", "%29");
+	  str = com.google.gwt.http.client.URL.encodeQueryString(str);
+	  return str;
   }
 
 }

@@ -479,7 +479,14 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
       if (chan.isConnected()) {   
     	  logWarn(chan, "metric command : " + Arrays.toString(cmd));
     	  if (cmd.length == 2) {
-    		  chan.write(Arrays.toString(tsdb.metrics.getOrCreateId(cmd[1])));
+    		  String metric = cmd[1];
+    		  try {
+    		  	  metric = java.net.URLDecoder.decode(metric, "UTF-8");
+			  } catch (java.io.UnsupportedEncodingException e) {
+				  throw new IllegalArgumentException("Unable to decode metric: " + metric 
+						  + ", error: " + e.getMessage());
+			  }
+    		  chan.write(Arrays.toString(tsdb.metrics.getOrCreateId(metric)));
     	  }
       }
       return Deferred.fromResult(null);
