@@ -289,7 +289,9 @@ public final class Plot {
       gp.write("plot ");
       for (int i = 0; i < nseries; i++) {
         final DataPoints dp = datapoints.get(i);
-        final String title = dp.metricName() + dp.getTags();
+        String title = dp.metricName() + dp.getTags();
+        // escape backslash and quote char
+        title = title.replace("\\", "\\\\").replace("\"", "\\\"");
         gp.append(" \"").append(datafiles[i]).append("\" using 1:2 title \"")
           // TODO(tsuna): Escape double quotes in title.
           .append(title).write('"');
