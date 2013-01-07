@@ -776,7 +776,13 @@ final class GraphHandler implements HttpRpc {
     try {
       final StringBuilder tagbuf = new StringBuilder();
       for (final DataPoints dp : plot.getDataPoints()) {
-        final String metric = dp.metricName();
+        String metric = dp.metricName();
+        try {
+            metric = java.net.URLEncoder.encode(metric, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException("Unable to encode metric: " + metric 
+    			  + ", error: " + e.getMessage());
+        }
         tagbuf.setLength(0);
         for (final Map.Entry<String, String> tag : dp.getTags().entrySet()) {
           tagbuf.append(' ').append(tag.getKey())
