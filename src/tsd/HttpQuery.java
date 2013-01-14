@@ -39,6 +39,7 @@ import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 import org.jboss.netty.handler.codec.http.HttpVersion;
+import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.QueryStringDecoder;
 import org.jboss.netty.util.CharsetUtil;
 
@@ -129,8 +130,14 @@ final class HttpQuery {
    */
   public Map<String, List<String>> getQueryString() {
     if (querystring == null) {
+      String uri = null;
+      if (HttpMethod.POST == request.getMethod()) {
+        uri = request.getUri() + "?" + request.getContent().toString("ISO-8859-1");
+      } else {
+        uri = request.getUri();
+      }
       try {
-        querystring = new QueryStringDecoder(request.getUri()).getParameters();
+        querystring = new QueryStringDecoder(uri).getParameters();
       } catch (IllegalArgumentException e) {
         throw new BadRequestException("Bad query string: " + e.getMessage());
       }
