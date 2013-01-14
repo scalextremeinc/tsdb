@@ -148,12 +148,14 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
   private void handleHttpQuery(final Channel chan, final HttpRequest req) {
     http_rpcs_received.incrementAndGet();
     final HttpQuery query = new HttpQuery(req, chan);
+    /* this is turned off because HttpChunkAggregator is added to PipelineFactory
     if (req.isChunked()) {
       logError(query, "Received an unsupported chunked request: "
                + query.request());
       query.badRequest("Chunked request not supported.");
       return;
     }
+    */
     try {
       final HttpRpc rpc = http_commands.get(getEndPoint(query));
       if (rpc != null) {
