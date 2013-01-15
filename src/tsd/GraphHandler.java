@@ -143,6 +143,9 @@ final class GraphHandler implements HttpRpc {
         + tsdbqueries.length + " `m' parameters.");
     }
     for (final Query tsdbquery : tsdbqueries) {
+      if (null == tsdbquery) {
+        continue;
+      }
       try {
         tsdbquery.setStartTime(start_time);
       } catch (IllegalArgumentException e) {
@@ -162,6 +165,9 @@ final class GraphHandler implements HttpRpc {
     final HashSet<String>[] aggregated_tags = new HashSet[nqueries];
     int npoints = 0;
     for (int i = 0; i < nqueries; i++) {
+      if (null == tsdbqueries[i]) {
+          continue;
+      }
       try {  // execute the TSDB query!
         // XXX This is slow and will block Netty.  TODO(tsuna): Don't block.
         // TODO(tsuna): Optimization: run each query in parallel.
@@ -860,7 +866,8 @@ final class GraphHandler implements HttpRpc {
       try {
         tsdbquery.setTimeSeries(metric, parsedtags, agg, rate);
       } catch (NoSuchUniqueName e) {
-        throw new BadRequestException(e.getMessage());
+        LOG.warn("Skipping unknown tag value");
+        continue;
       }
       // downsampling function & interval.
       if (i > 0) {
