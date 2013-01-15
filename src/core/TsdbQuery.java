@@ -14,6 +14,7 @@ package net.opentsdb.core;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -222,14 +223,21 @@ final class TsdbQuery implements Query {
         if (group_by_values == null) {
           group_by_values = new ByteMap<byte[][]>();
         }
-        final short value_width = tsdb.tag_values.width();
-        final byte[][] value_ids = new byte[values.length][value_width];
-        group_by_values.put(tsdb.tag_names.getId(tag.getKey()),
-                            value_ids);
+        
+        LinkedList<byte[]> value_ids_lst = new LinkedList<byte[]>();
         for (int j = 0; j < values.length; j++) {
-          final byte[] value_id = tsdb.tag_values.getId(values[j]);
-          System.arraycopy(value_id, 0, value_ids[j], 0, value_width);
+          try {
+            final byte[] value_id = tsdb.tag_values.getId(values[j]);
+            value_ids_lst.add(value_id);
+          } catch (NoSuchUniqueName e) {
+            LOG.warn("Skipping unknown tag value: " + values[j]);
+          } 
         }
+        
+        final short value_width = tsdb.tag_values.width();
+        final byte[][] value_ids = value_ids_lst.toArray(
+            new byte[value_ids_lst.size()][value_width]);
+        group_by_values.put(tag_id, value_ids);
       }
     }
   }
