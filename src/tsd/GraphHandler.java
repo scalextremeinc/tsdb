@@ -866,7 +866,7 @@ final class GraphHandler implements HttpRpc {
       try {
         tsdbquery.setTimeSeries(metric, parsedtags, agg, rate);
       } catch (NoSuchUniqueName e) {
-        LOG.warn("Skipping unknown tag value");
+        LOG.warn("Skipping serie, metric: " + metric);
         continue;
       }
       // downsampling function & interval.
