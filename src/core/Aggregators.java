@@ -15,6 +15,9 @@ package net.opentsdb.core;
 import java.util.HashMap;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
 
 /**
  * Utility class that provides common, generally useful aggregators.
@@ -35,6 +38,18 @@ public final class Aggregators {
 
   /** Aggregator that returns the Standard Deviation of the data points. */
   public static final Aggregator DEV = new StdDev();
+  
+  /** Aggregator that returns the 80th percentile of the data points. */
+  public static final Aggregator PCT80 = new Percentile(80);
+  
+  /** Aggregator that returns the 85th percentile of the data points. */
+  public static final Aggregator PCT85 = new Percentile(85);
+  
+  /** Aggregator that returns the 90th percentile of the data points. */
+  public static final Aggregator PCT90 = new Percentile(90);
+  
+  /** Aggregator that returns the 95th percentile of the data points. */
+  public static final Aggregator PCT95 = new Percentile(95);
 
   /** Maps an aggregator name to its instance. */
   private static final HashMap<String, Aggregator> aggregators;
@@ -46,6 +61,10 @@ public final class Aggregators {
     aggregators.put("max", MAX);
     aggregators.put("avg", AVG);
     aggregators.put("dev", DEV);
+    aggregators.put("pct80", PCT80);
+    aggregators.put("pct85", PCT85);
+    aggregators.put("pct90", PCT90);
+    aggregators.put("pct95", PCT95);
   }
 
   private Aggregators() {
@@ -71,6 +90,48 @@ public final class Aggregators {
       return agg;
     }
     throw new NoSuchElementException("No such aggregator: " + name);
+  }
+  
+  private static final class Percentile implements Aggregator {
+    
+    private final int p;
+    private final double pp;
+    
+    public Percentile(int p) {
+      this.p = p;
+      pp = p / 100;
+    }
+      
+    public long runLong(final Longs values) {
+      // the naive approach to compute percentile
+      List<Long> valuesList = new ArrayList<Long>();
+      valuesList.add(new Long(values.nextLongValue()));
+      while (values.hasNextValue()) {
+        valuesList.add(new Long(values.nextLongValue()));
+      }
+      Collections.sort(valuesList);
+      int n = (int) Math.round(pp * valuesList.size() + 0.5);
+      
+      return valuesList.get(n - 1);
+    }
+
+    public double runDouble(final Doubles values) {
+      // the naive approach to compute percentile
+      List<Double> valuesList = new ArrayList<Double>();
+      valuesList.add(new Double(values.nextDoubleValue()));
+      while (values.hasNextValue()) {
+        valuesList.add(new Double(values.nextDoubleValue()));
+      }
+      Collections.sort(valuesList);
+      int n = (int) Math.round(pp * valuesList.size() + 0.5);
+      
+      return valuesList.get(n - 1);
+    }
+      
+    public String toString() {
+      return "pct" + p;
+    }
+      
   }
 
   private static final class Sum implements Aggregator {
