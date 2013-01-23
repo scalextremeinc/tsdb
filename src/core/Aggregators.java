@@ -102,7 +102,7 @@ public final class Aggregators {
     
     public Percentile(int p) {
       this.p = p;
-      pp = p / 100;
+      pp = p / 100d;
     }
       
     public long runLong(final Longs values) {
