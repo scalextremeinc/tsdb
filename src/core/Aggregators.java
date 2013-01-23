@@ -110,7 +110,7 @@ public final class Aggregators {
         valuesList.add(new Long(values.nextLongValue()));
       }
       Collections.sort(valuesList);
-      int n = (int) Math.round(pp * valuesList.size() + 0.5);
+      int n = (int) Math.round(pp * valuesList.size() + 0.5d);
       
       return valuesList.get(n - 1);
     }
@@ -123,7 +123,7 @@ public final class Aggregators {
         valuesList.add(new Double(values.nextDoubleValue()));
       }
       Collections.sort(valuesList);
-      int n = (int) Math.round(pp * valuesList.size() + 0.5);
+      int n = (int) Math.round(pp * valuesList.size() + 0.5d);
       
       return valuesList.get(n - 1);
     }
