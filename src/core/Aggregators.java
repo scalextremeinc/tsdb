@@ -50,8 +50,6 @@ public final class Aggregators {
   
   /** Aggregator that returns the 95th percentile of the data points. */
   public static final Aggregator PCT95 = new Percentile(95);
-  
-  public static final Aggregator PCT50 = new Percentile(50);
 
   /** Maps an aggregator name to its instance. */
   private static final HashMap<String, Aggregator> aggregators;
@@ -67,7 +65,6 @@ public final class Aggregators {
     aggregators.put("pct85", PCT85);
     aggregators.put("pct90", PCT90);
     aggregators.put("pct95", PCT95);
-    aggregators.put("pct50", PCT50);
   }
 
   private Aggregators() {
