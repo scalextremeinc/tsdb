@@ -50,6 +50,18 @@ public final class Aggregators {
   
   /** Aggregator that returns the 95th percentile of the data points. */
   public static final Aggregator PCT95 = new Percentile(95);
+  
+  /** Aggregator that returns the 80th percentile of the data points - NIST method. */
+  public static final Aggregator PCTN80 = new PercentileNIST(80);
+  
+  /** Aggregator that returns the 85th percentile of the data points - NIST method. */
+  public static final Aggregator PCTN85 = new PercentileNIST(85);
+  
+  /** Aggregator that returns the 90th percentile of the data points - NIST method. */
+  public static final Aggregator PCTN90 = new PercentileNIST(90);
+  
+  /** Aggregator that returns the 95th percentile of the data points - NIST method. */
+  public static final Aggregator PCTN95 = new PercentileNIST(95);
 
   /** Maps an aggregator name to its instance. */
   private static final HashMap<String, Aggregator> aggregators;
@@ -65,6 +77,10 @@ public final class Aggregators {
     aggregators.put("pct85", PCT85);
     aggregators.put("pct90", PCT90);
     aggregators.put("pct95", PCT95);
+    aggregators.put("pctn80", PCTN80);
+    aggregators.put("pctn85", PCTN85);
+    aggregators.put("pctn90", PCTN90);
+    aggregators.put("pctn95", PCTN95);
   }
 
   private Aggregators() {
@@ -109,6 +125,10 @@ public final class Aggregators {
       while (values.hasNextValue()) {
         valuesList.add(new Long(values.nextLongValue()));
       }
+      
+      if (valuesList.size() == 1)
+        return valuesList.get(0);
+      
       Collections.sort(valuesList);
       int n = (int) Math.round(pp * valuesList.size() + 0.5d);
       
@@ -122,6 +142,10 @@ public final class Aggregators {
       while (values.hasNextValue()) {
         valuesList.add(new Double(values.nextDoubleValue()));
       }
+      
+      if (valuesList.size() == 1)
+        return valuesList.get(0);
+      
       Collections.sort(valuesList);
       int n = (int) Math.round(pp * valuesList.size() + 0.5d);
       
@@ -130,6 +154,72 @@ public final class Aggregators {
       
     public String toString() {
       return "pct" + p;
+    }
+      
+  }
+  
+  private static final class PercentileNIST implements Aggregator {
+    
+    private final int p;
+    private final double pp;
+    
+    public PercentileNIST(int p) {
+      this.p = p;
+      pp = p / 100d;
+    }
+      
+    public long runLong(final Longs values) {
+      // the naive approach to compute percentile
+      List<Long> valuesList = new ArrayList<Long>();
+      valuesList.add(new Long(values.nextLongValue()));
+      while (values.hasNextValue()) {
+        valuesList.add(new Long(values.nextLongValue()));
+      }
+      if (valuesList.size() == 1)
+        return valuesList.get(0);
+      
+      Collections.sort(valuesList);
+      
+      double rank = (valuesList.size() + 1) * pp;
+      int n = (int) rank;
+      
+      if (n >= valuesList.size())
+        return valuesList.get(valuesList.size() - 1);
+      else if (n < 1)
+        return valuesList.get(0);
+      
+      long valN = valuesList.get(n - 1);
+      
+      return (long) (valN + (rank - n) * (valuesList.get(n) - valN));
+    }
+
+    public double runDouble(final Doubles values) {
+      // the naive approach to compute percentile
+      List<Double> valuesList = new ArrayList<Double>();
+      valuesList.add(new Double(values.nextDoubleValue()));
+      while (values.hasNextValue()) {
+        valuesList.add(new Double(values.nextDoubleValue()));
+      }
+      if (valuesList.size() == 1)
+        return valuesList.get(0);
+      
+      Collections.sort(valuesList);
+      
+      double rank = (valuesList.size() + 1) * pp;
+      int n = (int) rank;
+      
+      if (n >= valuesList.size())
+        return valuesList.get(valuesList.size() - 1);
+      else if (n < 1)
+        return valuesList.get(0);
+      
+      double valN = valuesList.get(n - 1);
+      
+      return valN + (rank - n) * (valuesList.get(n) - valN);
+    }
+      
+    public String toString() {
+      return "pctn" + p;
     }
       
   }
