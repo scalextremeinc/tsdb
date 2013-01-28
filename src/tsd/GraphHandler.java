@@ -187,11 +187,15 @@ final class GraphHandler implements HttpRpc {
     
     TaskExecutor executor = new TaskExecutor();
     List<TaskExecutor.TaskResult> results = executor.parallelize(tasks);
+    
     for (TaskExecutor.TaskResult result : results) {
         if (result.exception != null) {
             logInfo(query, "Query failed (stack trace coming): "
                 + tsdbqueries[result.id]);
-            throw new RuntimeException(result.exception.getMessage());
+            if (result.exception instanceof RuntimeException)
+                throw (RuntimeException) result.exception;
+            else
+                throw new RuntimeException(result.exception.getMessage());
         }
         try {
             final DataPoints[] series = (DataPoints[]) result.value;
