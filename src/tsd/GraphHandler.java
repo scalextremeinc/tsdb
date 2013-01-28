@@ -102,7 +102,7 @@ final class GraphHandler implements HttpRpc {
     // of throughput but we don't need high throughput here.  We use ABQ instead
     // of LBQ because it creates far fewer references.
     cachedir = RpcHandler.getDirectoryFromSystemProp("tsd.http.cachedir");
-    TaskExecutor.init(16, 32, 3000);
+    TaskExecutor.init(48, 64, 3000);
   }
 
   public void execute(final TSDB tsdb, final HttpQuery query) {
