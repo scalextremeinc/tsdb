@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -49,6 +50,7 @@ import net.opentsdb.graph.Plot;
 import net.opentsdb.stats.Histogram;
 import net.opentsdb.stats.StatsCollector;
 import net.opentsdb.uid.NoSuchUniqueName;
+import net.opentsdb.tsd.TaskExecutor;
 
 /**
  * Stateless handler of HTTP graph requests (the {@code /q} endpoint).
@@ -100,6 +102,7 @@ final class GraphHandler implements HttpRpc {
     // of throughput but we don't need high throughput here.  We use ABQ instead
     // of LBQ because it creates far fewer references.
     cachedir = RpcHandler.getDirectoryFromSystemProp("tsd.http.cachedir");
+    TaskExecutor.init(16, 32, 3000);
   }
 
   public void execute(final TSDB tsdb, final HttpQuery query) {
@@ -164,26 +167,45 @@ final class GraphHandler implements HttpRpc {
     @SuppressWarnings("unchecked")
     final HashSet<String>[] aggregated_tags = new HashSet[nqueries];
     int npoints = 0;
+    
+    List<TaskExecutor.Task> tasks = new LinkedList<TaskExecutor.Task>();
     for (int i = 0; i < nqueries; i++) {
       if (null == tsdbqueries[i]) {
           continue;
       }
-      try {  // execute the TSDB query!
-        // XXX This is slow and will block Netty.  TODO(tsuna): Don't block.
-        // TODO(tsuna): Optimization: run each query in parallel.
-        final DataPoints[] series = tsdbqueries[i].run();
-        for (final DataPoints datapoints : series) {
-          plot.add(datapoints, options.get(i));
-          aggregated_tags[i] = new HashSet<String>();
-          aggregated_tags[i].addAll(datapoints.getAggregatedTags());
-          npoints += datapoints.aggregatedSize();
+      final int ii = i;
+      final Query[] tsdbqueriesF = tsdbqueries;
+      tasks.add(new TaskExecutor.Task() {
+          public Object execute() throws Exception {
+              return tsdbqueriesF[ii].run();
+          }
+          public int getId() {
+              return ii;
+          }
+      });
+    }
+    
+    TaskExecutor executor = new TaskExecutor();
+    List<TaskExecutor.TaskResult> results = executor.parallelize(tasks);
+    for (TaskExecutor.TaskResult result : results) {
+        if (result.exception != null) {
+            logInfo(query, "Query failed (stack trace coming): "
+                + tsdbqueries[result.id]);
+            throw new RuntimeException(result.exception.getMessage());
         }
-      } catch (RuntimeException e) {
-        logInfo(query, "Query failed (stack trace coming): "
-                + tsdbqueries[i]);
-        throw e;
-      }
-      tsdbqueries[i] = null;  // free()
+        try {
+            final DataPoints[] series = (DataPoints[]) result.value;
+            for (final DataPoints datapoints : series) {
+              plot.add(datapoints, options.get(result.id));
+              aggregated_tags[result.id] = new HashSet<String>();
+              aggregated_tags[result.id].addAll(datapoints.getAggregatedTags());
+              npoints += datapoints.aggregatedSize();
+            }
+        } catch (RuntimeException e) {
+          logInfo(query, "Query failed (stack trace coming): "
+                + tsdbqueries[result.id]);
+          throw e;
+        }
     }
     tsdbqueries = null;  // free()
 

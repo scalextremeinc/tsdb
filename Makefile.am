@@ -70,6 +70,7 @@ tsdb_SRC := \
 	src/tsd/RpcHandler.java	\
 	src/tsd/StaticFileRpc.java	\
 	src/tsd/TelnetRpc.java	\
+	src/tsd/TaskExecutor.java \
 	src/tsd/WordSplitter.java	\
 	src/uid/NoSuchUniqueId.java	\
 	src/uid/NoSuchUniqueName.java	\
