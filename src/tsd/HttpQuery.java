@@ -124,20 +124,24 @@ final class HttpQuery {
   public int processingTimeMillis() {
     return (int) ((System.nanoTime() - start_time) / 1000000);
   }
-
-  /**
-   * Returns the query string parameters passed in the URI.
-   */
-  public Map<String, List<String>> getQueryString() {
-    if (querystring == null) {
+  
+  private String getUri() {
       String uri = null;
       if (HttpMethod.POST == request.getMethod()) {
         uri = request.getUri() + "?" + request.getContent().toString("ISO-8859-1");
       } else {
         uri = request.getUri();
       }
+      return uri;
+  }
+
+  /**
+   * Returns the query string parameters passed in the URI.
+   */
+  public Map<String, List<String>> getQueryString() {
+    if (querystring == null) {
       try {
-        querystring = new QueryStringDecoder(uri).getParameters();
+        querystring = new QueryStringDecoder(getUri()).getParameters();
       } catch (IllegalArgumentException e) {
         throw new BadRequestException("Bad query string: " + e.getMessage());
       }
@@ -541,7 +545,7 @@ final class HttpQuery {
   private void done() {
     final int processing_time = processingTimeMillis();
     httplatency.add(processing_time);
-    logInfo("HTTP " + request.getUri() + " done in " + processing_time + "ms");
+    logInfo("HTTP " + getUri() + " done in " + processing_time + "ms");
     deferred.callback(null);
   }
 
