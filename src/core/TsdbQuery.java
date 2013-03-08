@@ -89,6 +89,8 @@ final class TsdbQuery implements Query {
    * Invariant: an element cannot be both in this array and in {@code tags}.
    */
   private ArrayList<byte[]> group_bys;
+  
+  private Map<String, String> extra_tags;
 
   /**
    * Values we may be grouping on.
@@ -217,6 +219,9 @@ final class TsdbQuery implements Query {
         	values = Tags.splitString(tagvalue, '|');
         	aggregate_tag.put(tag_id, Boolean.FALSE);
         } else {
+            if (extra_tags == null)
+                extra_tags = new HashMap<String, String>();
+            extra_tags.put(tag.getKey(), tag.getValue().replace(' ', '+'));
         	values = Tags.splitString(tagvalue, ' ');
         	aggregate_tag.put(tag_id, Boolean.TRUE);
         }
@@ -370,6 +375,7 @@ final class TsdbQuery implements Query {
         thegroup = new SpanGroup(tsdb, getScanStartTime(), getScanEndTime(),
                                  null, rate, aggregator,
                                  sample_interval, downsampler);
+        thegroup.setExtraTags(extra_tags);
         // Copy the array because we're going to keep `group' and overwrite
         // its contents.  So we want the collection to have an immutable copy.
         final byte[] group_copy = new byte[group.length];

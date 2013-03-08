@@ -58,6 +58,8 @@ final class SpanGroup implements DataPoints {
    * @see #computeTags
    */
   private HashMap<String, String> tags;
+  
+  private Map<String, String> extra_tags;
 
   /**
    * The names of the tags that aren't shared by every single data point.
@@ -140,6 +142,10 @@ final class SpanGroup implements DataPoints {
       this.spans.add(span);
     }
   }
+  
+  public void setExtraTags(Map<String, String> extra_tags) {
+      this.extra_tags = extra_tags;
+  }
 
   /**
    * Computes the intersection set + symmetric difference of tags in all spans.
@@ -170,6 +176,9 @@ final class SpanGroup implements DataPoints {
       }
     }
     aggregated_tags = new ArrayList<String>(discarded_tags);
+    
+    if (extra_tags != null)
+        tags.putAll(extra_tags);
   }
 
   public String metricName() {
