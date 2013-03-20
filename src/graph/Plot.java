@@ -201,6 +201,14 @@ public final class Plot {
     writeGnuplotScript(basepath, datafiles);
     return npoints;
   }
+  
+  public int getStartTime() {
+      return start_time;
+  }
+  
+  public int getEndTime() {
+      return end_time;
+  }
 
   /**
    * Generates the Gnuplot script.

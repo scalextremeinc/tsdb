@@ -821,6 +821,10 @@ final class GraphHandler implements HttpRpc {
             .append('=').append(tag.getValue());
         }
         for (final DataPoint d : dp) {
+          final long ts = d.timestamp();
+          if (ts < plot.getStartTime() || ts > plot.getEndTime()) {
+            continue;
+          }
           asciifile.print(metric);
           asciifile.print(' ');
           asciifile.print(d.timestamp());
