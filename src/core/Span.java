@@ -22,27 +22,17 @@ import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.hbase.async.Bytes;
-import org.hbase.async.KeyValue;
-
 /**
  * Represents a read-only sequence of continuous data points.
  * <p>
- * This class stores a continuous sequence of {@link RowSeq}s in memory.
+ * This class stores a continuous sequence of {@link SpanView}s in memory.
  */
 final class Span implements DataPoints {
 
   private static final Logger LOG = LoggerFactory.getLogger(Span.class);
 
-  /** The {@link TSDB} instance we belong to. */
-  private final TSDB tsdb;
-
   /** All the rows in this span. */
-  private ArrayList<RowSeq> rows = new ArrayList<RowSeq>();
-
-  Span(final TSDB tsdb) {
-    this.tsdb = tsdb;
-  }
+  private List<? extends SpanView> rows;
 
   private void checkNotEmpty() {
     if (rows.size() == 0) {
@@ -66,7 +56,7 @@ final class Span implements DataPoints {
 
   public int size() {
     int size = 0;
-    for (final RowSeq row : rows) {
+    for (final SpanView row : rows) {
       size += row.size();
     }
     return size;
@@ -76,75 +66,8 @@ final class Span implements DataPoints {
     return 0;
   }
 
-  /**
-   * Adds an HBase row to this span, using a row from a scanner.
-   * @param row The compacted HBase row to add to this span.
-   * @throws IllegalArgumentException if the argument and this span are for
-   * two different time series.
-   * @throws IllegalArgumentException if the argument represents a row for
-   * data points that are older than those already added to this span.
-   */
-  void addRow(final KeyValue row) {
-    long last_ts = 0;
-    if (rows.size() != 0) {
-      // Verify that we have the same metric id and tags.
-      final byte[] key = row.key();
-      final RowSeq last = rows.get(rows.size() - 1);
-      final short metric_width = tsdb.metrics.width();
-      final short tags_offset = (short) (metric_width + Const.TIMESTAMP_BYTES);
-      final short tags_bytes = (short) (key.length - tags_offset);
-      String error = null;
-      if (key.length != last.key.length) {
-        error = "row key length mismatch";
-      } else if (Bytes.memcmp(key, last.key, 0, metric_width) != 0) {
-        error = "metric ID mismatch";
-      } else if (Bytes.memcmp(key, last.key, tags_offset, tags_bytes) != 0) {
-        error = "tags mismatch";
-      }
-      if (error != null) {
-        throw new IllegalArgumentException(error + ". "
-            + "This Span's last row key is " + Arrays.toString(last.key)
-            + " whereas the row key being added is " + Arrays.toString(key)
-            + " and metric_width=" + metric_width);
-      }
-      last_ts = last.timestamp(last.size() - 1);  // O(1)
-      // Optimization: check whether we can put all the data points of `row'
-      // into the last RowSeq object we created, instead of making a new
-      // RowSeq.  If the time delta between the timestamp encoded in the
-      // row key of the last RowSeq we created and the timestamp of the
-      // last data point in `row' is small enough, we can merge `row' into
-      // the last RowSeq.
-      if (RowSeq.canTimeDeltaFit(lastTimestampInRow(metric_width, row)
-                                 - last.baseTime())) {
-        last.addRow(row);
-        return;
-      }
-    }
-
-    final RowSeq rowseq = new RowSeq(tsdb);
-    rowseq.setRow(row);
-    if (last_ts >= rowseq.timestamp(0)) {
-      LOG.error("New RowSeq added out of order to this Span! Last = " +
-                rows.get(rows.size() - 1) + ", new = " + rowseq);
-      return;
-    }
-    rows.add(rowseq);
-  }
-
-  /**
-   * Package private helper to access the last timestamp in an HBase row.
-   * @param metric_width The number of bytes on which metric IDs are stored.
-   * @param row A compacted HBase row.
-   * @return A strictly positive 32-bit timestamp.
-   * @throws IllegalArgumentException if {@code row} doesn't contain any cell.
-   */
-  static long lastTimestampInRow(final short metric_width,
-                                 final KeyValue row) {
-    final long base_time = Bytes.getUnsignedInt(row.key(), metric_width);
-    final byte[] qual = row.qualifier();
-    final short last_delta = (short)
-      (Bytes.getUnsignedShort(qual, qual.length - 2) >>> Const.FLAG_BITS);
-    return base_time + last_delta;
+  public void setSpanViews(List<? extends SpanView> rows) {
+      this.rows = rows;
   }
 
   public SeekableView iterator() {
@@ -155,12 +78,12 @@ final class Span implements DataPoints {
    * Finds the index of the row of the ith data point and the offset in the row.
    * @param i The index of the data point to find.
    * @return two ints packed in a long.  The first int is the index of the row
-   * in {@code rows} and the second is offset in that {@link RowSeq} instance.
+   * in {@code rows} and the second is offset in that {@link SpanView} instance.
    */
   private long getIdxOffsetFor(final int i) {
     int idx = 0;
     int offset = 0;
-    for (final RowSeq row : rows) {
+    for (final SpanView row : rows) {
       final int sz = row.size();
       if (offset + sz > i) {
         break;
@@ -222,7 +145,7 @@ final class Span implements DataPoints {
    */
   private short seekRow(final long timestamp) {
     short row_index = 0;
-    RowSeq row = null;
+    SpanView row = null;
     final int nrows = rows.size();
     for (int i = 0; i < nrows; i++) {
       row = rows.get(i);
@@ -247,11 +170,11 @@ final class Span implements DataPoints {
   /** Iterator for {@link Span}s. */
   final class Iterator implements SeekableView {
 
-    /** Index of the {@link RowSeq} we're currently at, in {@code rows}. */
+    /** Index of the {@link SpanView} we're currently at, in {@code rows}. */
     private short row_index;
 
     /** Iterator on the current row. */
-    private RowSeq.Iterator current_row;
+    private SeekableView current_row;
 
     Iterator() {
       current_row = rows.get(0).internalIterator();
@@ -302,7 +225,7 @@ final class Span implements DataPoints {
   /**
    * Iterator that downsamples the data using an {@link Aggregator}.
    * <p>
-   * This implementation relies on the fact that the {@link RowSeq}s in this
+   * This implementation relies on the fact that the {@link SpanView}s in this
    * {@link Span} have {@code O(1)} access to individual data points, in order
    * to be efficient.
    */
@@ -322,11 +245,11 @@ final class Span implements DataPoints {
     /** Function to use to for downsampling. */
     private final Aggregator downsampler;
 
-    /** Index of the {@link RowSeq} we're currently at, in {@code rows}. */
+    /** Index of the {@link SpanView} we're currently at, in {@code rows}. */
     private short row_index;
 
     /** The row we're currently at. */
-    private RowSeq.Iterator current_row;
+    private SpanViewIterator current_row;
 
     /**
      * Current timestamp (unsigned 32 bits).

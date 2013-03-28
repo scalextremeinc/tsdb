@@ -41,6 +41,8 @@ tsdb_SRC := \
 	src/core/RowKey.java	\
 	src/core/RowSeq.java	\
 	src/core/SeekableView.java	\
+	src/core/SpanView.java	\
+	src/core/SpanViewIterator.java \
 	src/core/Span.java	\
 	src/core/SpanGroup.java	\
 	src/core/TSDB.java	\

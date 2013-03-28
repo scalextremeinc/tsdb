@@ -31,7 +31,7 @@ import org.hbase.async.KeyValue;
  * This class stores in memory the data of one or more continuous
  * HBase rows for a given time series.
  */
-final class RowSeq implements DataPoints {
+final class RowSeq implements SpanView {
 
   private static final Logger LOG = LoggerFactory.getLogger(RowSeq.class);
 
@@ -253,7 +253,7 @@ final class RowSeq implements DataPoints {
   }
 
   /** Package private iterator method to access it as a {@link Iterator}. */
-  Iterator internalIterator() {
+  public SpanViewIterator internalIterator() {
     // XXX this is now grossly inefficient, need to walk the arrays once.
     return new Iterator();
   }
@@ -357,7 +357,7 @@ final class RowSeq implements DataPoints {
   }
 
   /** Iterator for {@link RowSeq}s.  */
-  final class Iterator implements SeekableView, DataPoint {
+  final class Iterator implements SpanViewIterator {
 
     /** Current qualifier.  */
     private short qualifier;
@@ -463,12 +463,12 @@ final class RowSeq implements DataPoints {
     // ---------------- //
 
     /** Helper to take a snapshot of the state of this iterator.  */
-    int saveState() {
+    public int saveState() {
       return (qual_index << 16) | (value_index & 0xFFFF);
     }
 
     /** Helper to restore a snapshot of the state of this iterator.  */
-    void restoreState(int state) {
+    public void restoreState(int state) {
       value_index = (short) (state & 0xFFFF);
       state >>>= 16;
       qual_index = (short) state;
@@ -479,13 +479,13 @@ final class RowSeq implements DataPoints {
      * Look a head to see the next timestamp.
      * @throws IndexOutOfBoundsException if we reached the end already.
      */
-    long peekNextTimestamp() {
+    public long peekNextTimestamp() {
       return base_time
         + (Bytes.getUnsignedShort(qualifiers, qual_index) >>> Const.FLAG_BITS);
     }
 
     /** Only returns internal state for the iterator itself.  */
-    String toStringSummary() {
+    public String toStringSummary() {
       return "RowSeq.Iterator(qual_index=" + qual_index
         + ", value_index=" + value_index;
     }

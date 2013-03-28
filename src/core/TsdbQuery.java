@@ -13,6 +13,7 @@
 package net.opentsdb.core;
 
 import java.nio.charset.Charset;
+import java.util.List;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Arrays;
@@ -266,6 +267,7 @@ final class TsdbQuery implements Query {
     final short metric_width = tsdb.metrics.width();
     final TreeMap<byte[], Span> spans =  // The key is a row key from HBase.
       new TreeMap<byte[], Span>(new SpanCmp(metric_width));
+    final HashMap<byte[], List<RowSeq>> rows_map = new HashMap<byte[], List<RowSeq>>();
     int nrows = 0;
     int hbase_time = 0;  // milliseconds.
     long starttime = System.nanoTime();
@@ -281,12 +283,21 @@ final class TsdbQuery implements Query {
                 + " our scanner (" + scanner + ")! " + row + " does not start"
                 + " with " + Arrays.toString(metric));
           }
+
+          List<RowSeq> rowseqs = rows_map.get(key);
+          if (rowseqs == null) {
+            rowseqs = new ArrayList<RowSeq>();
+            rows_map.put(key, rowseqs);
+          }
+          addRowToSeq(rowseqs, tsdb.compact(row));
+          
           Span datapoints = spans.get(key);
           if (datapoints == null) {
-            datapoints = new Span(tsdb);
+            datapoints = new Span();
+            datapoints.setSpanViews(rowseqs);
             spans.put(key, datapoints);
           }
-          datapoints.addRow(tsdb.compact(row));
+          
           nrows++;
           starttime = System.nanoTime();
         }
@@ -304,6 +315,77 @@ final class TsdbQuery implements Query {
       return null;
     }
     return spans;
+  }
+  
+  /**
+   * Adds an HBase row to this span, using a row from a scanner.
+   * @param row The compacted HBase row to add to this span.
+   * @throws IllegalArgumentException if the argument and this span are for
+   * two different time series.
+   * @throws IllegalArgumentException if the argument represents a row for
+   * data points that are older than those already added to this span.
+   */
+  private void addRowToSeq(List<RowSeq> rows, final KeyValue row) {
+    long last_ts = 0;
+    if (rows.size() != 0) {
+      // Verify that we have the same metric id and tags.
+      final byte[] key = row.key();
+      final RowSeq last = rows.get(rows.size() - 1);
+      final short metric_width = tsdb.metrics.width();
+      final short tags_offset = (short) (metric_width + Const.TIMESTAMP_BYTES);
+      final short tags_bytes = (short) (key.length - tags_offset);
+      String error = null;
+      if (key.length != last.key.length) {
+        error = "row key length mismatch";
+      } else if (Bytes.memcmp(key, last.key, 0, metric_width) != 0) {
+        error = "metric ID mismatch";
+      } else if (Bytes.memcmp(key, last.key, tags_offset, tags_bytes) != 0) {
+        error = "tags mismatch";
+      }
+      if (error != null) {
+        throw new IllegalArgumentException(error + ". "
+            + "This Span's last row key is " + Arrays.toString(last.key)
+            + " whereas the row key being added is " + Arrays.toString(key)
+            + " and metric_width=" + metric_width);
+      }
+      last_ts = last.timestamp(last.size() - 1);  // O(1)
+      // Optimization: check whether we can put all the data points of `row'
+      // into the last RowSeq object we created, instead of making a new
+      // RowSeq.  If the time delta between the timestamp encoded in the
+      // row key of the last RowSeq we created and the timestamp of the
+      // last data point in `row' is small enough, we can merge `row' into
+      // the last RowSeq.
+      if (RowSeq.canTimeDeltaFit(lastTimestampInRow(metric_width, row)
+                                 - last.baseTime())) {
+        last.addRow(row);
+        return;
+      }
+    }
+
+    final RowSeq rowseq = new RowSeq(tsdb);
+    rowseq.setRow(row);
+    if (last_ts >= rowseq.timestamp(0)) {
+      LOG.error("New RowSeq added out of order to this Span! Last = " +
+                rows.get(rows.size() - 1) + ", new = " + rowseq);
+      return;
+    }
+    rows.add(rowseq);
+  }
+  
+  /**
+   * Package private helper to access the last timestamp in an HBase row.
+   * @param metric_width The number of bytes on which metric IDs are stored.
+   * @param row A compacted HBase row.
+   * @return A strictly positive 32-bit timestamp.
+   * @throws IllegalArgumentException if {@code row} doesn't contain any cell.
+   */
+  static long lastTimestampInRow(final short metric_width,
+                                 final KeyValue row) {
+    final long base_time = Bytes.getUnsignedInt(row.key(), metric_width);
+    final byte[] qual = row.qualifier();
+    final short last_delta = (short)
+      (Bytes.getUnsignedShort(qual, qual.length - 2) >>> Const.FLAG_BITS);
+    return base_time + last_delta;
   }
 
   /**
