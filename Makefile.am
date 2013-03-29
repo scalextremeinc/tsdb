@@ -46,9 +46,11 @@ tsdb_SRC := \
 	src/core/Span.java	\
 	src/core/SpanGroup.java	\
 	src/core/TSDB.java	\
+	src/core/TSDBImpl.java	\
 	src/core/Tags.java	\
 	src/core/TsdbQuery.java	\
 	src/core/WritableDataPoints.java	\
+	src/core/sql/TsdbSql.java	\
 	src/graph/Plot.java	\
 	src/stats/Histogram.java	\
 	src/stats/StatsCollector.java	\
@@ -88,6 +90,7 @@ tsdb_DEPS = \
 	$(NETTY)	\
 	$(SLF4J_API)	\
 	$(SUASYNC)	\
+	$(C3P0)	\
 	$(ZOOKEEPER)
 
 # Install all the .jar files in pkgdatadir.

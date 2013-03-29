@@ -62,7 +62,7 @@ final class TsdbQuery implements Query {
   private static final Charset CHARSET = Charset.forName("ISO-8859-1");
 
   /** The TSDB we belong to. */
-  private final TSDB tsdb;
+  private final TSDBImpl tsdb;
 
   /** Value used for timestamps that are uninitialized.  */
   private static final int UNSET = -1;
@@ -120,7 +120,7 @@ final class TsdbQuery implements Query {
   private Map<byte[], Boolean> aggregate_tag = new HashMap<byte[], Boolean>();
 
   /** Constructor. */
-  public TsdbQuery(final TSDB tsdb) {
+  public TsdbQuery(final TSDBImpl tsdb) {
     this.tsdb = tsdb;
   }
 
@@ -499,7 +499,7 @@ final class TsdbQuery implements Query {
     if (tags.size() > 0 || group_bys != null) {
       createAndSetFilter(scanner);
     }
-    scanner.setFamily(TSDB.FAMILY);
+    scanner.setFamily(TSDBImpl.FAMILY);
     return scanner;
   }
 

@@ -28,8 +28,8 @@ final class RowKey {
    * @return The name of the metric.
    */
   static String metricName(final TSDB tsdb, final byte[] row) {
-    final byte[] id = Arrays.copyOfRange(row, 0, tsdb.metrics.width());
-    return tsdb.metrics.getName(id);
+    final byte[] id = Arrays.copyOfRange(row, 0, tsdb.getMetrics().width());
+    return tsdb.getMetrics().getName(id);
   }
 
 }

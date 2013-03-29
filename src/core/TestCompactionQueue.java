@@ -50,7 +50,7 @@ import static org.powermock.api.mockito.PowerMockito.mock;
                   TSDB.class, UniqueId.class })
 final class TestCompactionQueue {
 
-  private TSDB tsdb = mock(TSDB.class);
+  private TSDBImpl tsdb = mock(TSDBImpl.class);
   private static final byte[] TABLE = { 't', 'a', 'b', 'l', 'e' };
   private static final byte[] KEY = { 0, 0, 1, 78, 36, -84, 42, 0, 0, 1, 0, 0, 2 };
   private static final byte[] FAMILY = { 't' };
@@ -62,7 +62,7 @@ final class TestCompactionQueue {
     // Inject the attributes we need into the "tsdb" object.
     Whitebox.setInternalState(tsdb, "metrics", mock(UniqueId.class));
     Whitebox.setInternalState(tsdb, "table", TABLE);
-    Whitebox.setInternalState(TSDB.class, "enable_compactions", true);
+    Whitebox.setInternalState(TSDBImpl.class, "enable_compactions", true);
     // Stub out the compaction thread, so it doesn't even start.
     PowerMockito.whenNew(CompactionQueue.Thrd.class).withNoArguments()
       .thenReturn(mock(CompactionQueue.Thrd.class));

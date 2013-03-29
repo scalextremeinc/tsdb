@@ -13,20 +13,11 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-OPENTSDB_THIRD_PARTY_BASE_URL := http://opentsdb.googlecode.com/files
-FETCH_DEPENDENCY := ./build-aux/fetchdep.sh "$$@"
-all-am: build-aux/fetchdep.sh
-THIRD_PARTY =
+C3P0_VERSION := 0.9.2
+C3P0 := third_party/c3p0/c3p0-$(C3P0_VERSION).jar
+C3P0_BASE_URL := http://repo1.maven.org/maven2/com/mchange/c3p0/$(C3P0_VERSION)
 
-include third_party/c3p0/include.mk
-include third_party/gwt/include.mk
-include third_party/hbase/include.mk
-include third_party/javassist/include.mk
-include third_party/junit/include.mk
-include third_party/logback/include.mk
-include third_party/mockito/include.mk
-include third_party/netty/include.mk
-include third_party/powermock/include.mk
-include third_party/slf4j/include.mk
-include third_party/suasync/include.mk
-include third_party/zookeeper/include.mk
+$(C3P0): $(C3P0).md5
+	set dummy "$(C3P0_BASE_URL)" "$(C3P0)"; shift; $(FETCH_DEPENDENCY)
+
+THIRD_PARTY += $(C3P0)

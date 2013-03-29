@@ -453,7 +453,7 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
 		  if (chan.isConnected()) {   
 			  logWarn(chan, "tag key command : " + Arrays.toString(cmd));
 			  if (cmd.length == 2) {
-				  chan.write(Arrays.toString(tsdb.tag_names.getOrCreateId(cmd[1])));
+				  chan.write(Arrays.toString(tsdb.getTagNames().getOrCreateId(cmd[1])));
 			  }
 		  }
 		  return Deferred.fromResult(null);
@@ -467,7 +467,7 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
 		  if (chan.isConnected()) {   
 			  logWarn(chan, "tag value command : " + Arrays.toString(cmd));
 			  if (cmd.length == 2) {
-				  chan.write(Arrays.toString((tsdb.tag_values.getOrCreateId(cmd[1]))));
+				  chan.write(Arrays.toString((tsdb.getTagValues().getOrCreateId(cmd[1]))));
 			  }
 		  }
 		  return Deferred.fromResult(null);
@@ -488,7 +488,7 @@ final class RpcHandler extends SimpleChannelUpstreamHandler {
 				  throw new IllegalArgumentException("Unable to decode metric: " + metric 
 						  + ", error: " + e.getMessage());
 			  }
-    		  chan.write(Arrays.toString(tsdb.metrics.getOrCreateId(metric)));
+    		  chan.write(Arrays.toString(tsdb.getMetrics().getOrCreateId(metric)));
     	  }
       }
       return Deferred.fromResult(null);

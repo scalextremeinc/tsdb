@@ -26,6 +26,7 @@ import org.hbase.async.HBaseClient;
 
 import net.opentsdb.BuildData;
 import net.opentsdb.core.TSDB;
+import net.opentsdb.core.TSDBImpl;
 import net.opentsdb.tsd.PipelineFactory;
 
 /**
@@ -125,7 +126,7 @@ final class TSDMain {
       client.ensureTableExists(uidtable).joinUninterruptibly();
 
       client.setFlushInterval(flush_interval);
-      final TSDB tsdb = new TSDB(client, table, uidtable);
+      final TSDB tsdb = new TSDBImpl(client, table, uidtable);
       registerShutdownHook(tsdb);
       final ServerBootstrap server = new ServerBootstrap(factory);
 

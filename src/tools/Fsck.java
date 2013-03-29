@@ -32,6 +32,7 @@ import net.opentsdb.core.IllegalDataException;
 import net.opentsdb.core.Internal;
 import net.opentsdb.core.Query;
 import net.opentsdb.core.TSDB;
+import net.opentsdb.core.TSDBImpl;
 import net.opentsdb.uid.UniqueId;
 
 /**
@@ -68,7 +69,7 @@ final class Fsck {
 
     final HBaseClient client = CliOptions.clientFromOptions(argp);
     final byte[] table = argp.get("--table", "tsdb").getBytes();
-    final TSDB tsdb = new TSDB(client, argp.get("--table", "tsdb"),
+    final TSDB tsdb = new TSDBImpl(client, argp.get("--table", "tsdb"),
                                argp.get("--uidtable", "tsdb-uid"));
     final boolean fix = argp.has("--fix");
     argp = null;

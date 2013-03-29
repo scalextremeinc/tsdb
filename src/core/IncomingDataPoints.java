@@ -45,7 +45,7 @@ final class IncomingDataPoints implements WritableDataPoints {
   static final Histogram putlatency = new Histogram(16000, (short) 2, 100);
 
   /** The {@code TSDB} instance we belong to. */
-  private final TSDB tsdb;
+  private final TSDBImpl tsdb;
 
   /**
    * The row key.
@@ -76,7 +76,7 @@ final class IncomingDataPoints implements WritableDataPoints {
    * Constructor.
    * @param tsdb The TSDB we belong to.
    */
-  IncomingDataPoints(final TSDB tsdb) {
+  IncomingDataPoints(final TSDBImpl tsdb) {
     this.tsdb = tsdb;
     this.qualifiers = new short[3];
     this.values = new long[3];
@@ -106,7 +106,7 @@ final class IncomingDataPoints implements WritableDataPoints {
    * Returns a partially initialized row key for this metric and these tags.
    * The only thing left to fill in is the base timestamp.
    */
-  static byte[] rowKeyTemplate(final TSDB tsdb,
+  static byte[] rowKeyTemplate(final TSDBImpl tsdb,
                                final String metric,
                                final Map<String, String> tags) {
     final short metric_width = tsdb.metrics.width();
@@ -227,7 +227,7 @@ final class IncomingDataPoints implements WritableDataPoints {
                     : Bytes.getInt(value) & 0x00000000FFFFFFFFL);
     size++;
 
-    final PutRequest point = new PutRequest(tsdb.table, row, TSDB.FAMILY,
+    final PutRequest point = new PutRequest(tsdb.table, row, TSDBImpl.FAMILY,
                                             Bytes.fromShort(qualifier),
                                             value);
     // TODO(tsuna): The following timing is rather useless.  First of all,
