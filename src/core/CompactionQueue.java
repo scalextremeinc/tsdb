@@ -66,7 +66,7 @@ final class CompactionQueue extends ConcurrentSkipListMap<byte[], Boolean> {
   private final AtomicLong deleted_cells = new AtomicLong();
 
   /** The {@code TSDB} instance we belong to. */
-  private final TSDBImpl tsdb;
+  private final TsdbHbase tsdb;
 
   /** On how many bytes do we encode metrics IDs.  */
   private final short metric_width;
@@ -75,11 +75,11 @@ final class CompactionQueue extends ConcurrentSkipListMap<byte[], Boolean> {
    * Constructor.
    * @param tsdb The TSDB we belong to.
    */
-  public CompactionQueue(final TSDBImpl tsdb) {
+  public CompactionQueue(final TsdbHbase tsdb) {
     super(new Cmp(tsdb));
     this.tsdb = tsdb;
     metric_width = tsdb.metrics.width();
-    if (TSDBImpl.enable_compactions) {
+    if (TsdbHbase.enable_compactions) {
       startCompactionThread();
     }
   }
@@ -118,7 +118,7 @@ final class CompactionQueue extends ConcurrentSkipListMap<byte[], Boolean> {
   void collectStats(final StatsCollector collector) {
     collector.record("compaction.count", trivial_compactions, "type=trivial");
     collector.record("compaction.count", complex_compactions, "type=complex");
-    if (!TSDBImpl.enable_compactions) {
+    if (!TsdbHbase.enable_compactions) {
       return;
     }
     // The remaining stats only make sense with compactions enabled.
@@ -371,7 +371,7 @@ final class CompactionQueue extends ConcurrentSkipListMap<byte[], Boolean> {
         return null;              // ... Don't write back compacted.
       }
     }
-    if (!TSDBImpl.enable_compactions) {
+    if (!TsdbHbase.enable_compactions) {
       return null;
     }
 
@@ -897,7 +897,7 @@ final class CompactionQueue extends ConcurrentSkipListMap<byte[], Boolean> {
     /** On how many bytes do we encode metrics IDs.  */
     private final short metric_width;
 
-    public Cmp(final TSDBImpl tsdb) {
+    public Cmp(final TsdbHbase tsdb) {
       metric_width = tsdb.metrics.width();
     }
 

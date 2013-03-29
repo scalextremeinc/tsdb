@@ -76,9 +76,9 @@ public final class Internal {
   }
 
   /** @see TsdbQuery#getScanner */
-  public static Scanner getScanner(final Query query) {
-    return ((TsdbQuery) query).getScanner();
-  }
+  //public static Scanner getScanner(final Query query) {
+  //  return ((TsdbQuery) query).getScanner();
+  //}
 
   /** @see RowKey#metricName */
   public static String metricName(final TSDB tsdb, final byte[] id) {

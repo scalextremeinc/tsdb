@@ -43,10 +43,13 @@ tsdb_SRC := \
 	src/core/SeekableView.java	\
 	src/core/SpanView.java	\
 	src/core/SpanViewIterator.java \
+	src/core/StorageException.java \
+	src/core/StorageQuery.java \
+	src/core/StorageQueryHbase.java \
 	src/core/Span.java	\
 	src/core/SpanGroup.java	\
 	src/core/TSDB.java	\
-	src/core/TSDBImpl.java	\
+	src/core/TsdbHbase.java	\
 	src/core/Tags.java	\
 	src/core/TsdbQuery.java	\
 	src/core/WritableDataPoints.java	\

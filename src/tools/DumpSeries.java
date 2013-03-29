@@ -27,7 +27,7 @@ import net.opentsdb.core.IllegalDataException;
 import net.opentsdb.core.Internal;
 import net.opentsdb.core.Query;
 import net.opentsdb.core.TSDB;
-import net.opentsdb.core.TSDBImpl;
+import net.opentsdb.core.TsdbHbase;
 
 /**
  * Tool to dump the data straight from HBase.
@@ -68,75 +68,75 @@ final class DumpSeries {
 
     final HBaseClient client = CliOptions.clientFromOptions(argp);
     final byte[] table = argp.get("--table", "tsdb").getBytes();
-    final TSDB tsdb = new TSDBImpl(client, argp.get("--table", "tsdb"),
+    final TSDB tsdb = new TsdbHbase(client, argp.get("--table", "tsdb"),
                                argp.get("--uidtable", "tsdb-uid"));
     final boolean delete = argp.has("--delete");
     final boolean importformat = delete || argp.has("--import");
     argp = null;
     try {
-      doDump(tsdb, client, table, delete, importformat, args);
+      //doDump(tsdb, client, table, delete, importformat, args);
     } finally {
       tsdb.shutdown().joinUninterruptibly();
     }
   }
 
-  private static void doDump(final TSDB tsdb,
-                             final HBaseClient client,
-                             final byte[] table,
-                             final boolean delete,
-                             final boolean importformat,
-                             final String[] args) throws Exception {
-    final ArrayList<Query> queries = new ArrayList<Query>();
-    CliQuery.parseCommandLineQuery(args, tsdb, queries, null, null);
+  //private static void doDump(final TSDB tsdb,
+                             //final HBaseClient client,
+                             //final byte[] table,
+                             //final boolean delete,
+                             //final boolean importformat,
+                             //final String[] args) throws Exception {
+    //final ArrayList<Query> queries = new ArrayList<Query>();
+    //CliQuery.parseCommandLineQuery(args, tsdb, queries, null, null);
 
-    final StringBuilder buf = new StringBuilder();
-    for (final Query query : queries) {
-      final Scanner scanner = Internal.getScanner(query);
-      ArrayList<ArrayList<KeyValue>> rows;
-      while ((rows = scanner.nextRows().joinUninterruptibly()) != null) {
-        for (final ArrayList<KeyValue> row : rows) {
-          buf.setLength(0);
-          final byte[] key = row.get(0).key();
-          final long base_time = Internal.baseTime(tsdb, key);
-          final String metric = Internal.metricName(tsdb, key);
-          // Print the row key.
-          if (!importformat) {
-            buf.append(Arrays.toString(key))
-              .append(' ')
-              .append(metric)
-              .append(' ')
-              .append(base_time)
-              .append(" (").append(date(base_time)).append(") ");
-            try {
-              buf.append(Internal.getTags(tsdb, key));
-            } catch (RuntimeException e) {
-              buf.append(e.getClass().getName() + ": " + e.getMessage());
-            }
-            buf.append('\n');
-            System.out.print(buf);
-          }
+    //final StringBuilder buf = new StringBuilder();
+    //for (final Query query : queries) {
+      //final Scanner scanner = Internal.getScanner(query);
+      //ArrayList<ArrayList<KeyValue>> rows;
+      //while ((rows = scanner.nextRows().joinUninterruptibly()) != null) {
+        //for (final ArrayList<KeyValue> row : rows) {
+          //buf.setLength(0);
+          //final byte[] key = row.get(0).key();
+          //final long base_time = Internal.baseTime(tsdb, key);
+          //final String metric = Internal.metricName(tsdb, key);
+          //// Print the row key.
+          //if (!importformat) {
+            //buf.append(Arrays.toString(key))
+              //.append(' ')
+              //.append(metric)
+              //.append(' ')
+              //.append(base_time)
+              //.append(" (").append(date(base_time)).append(") ");
+            //try {
+              //buf.append(Internal.getTags(tsdb, key));
+            //} catch (RuntimeException e) {
+              //buf.append(e.getClass().getName() + ": " + e.getMessage());
+            //}
+            //buf.append('\n');
+            //System.out.print(buf);
+          //}
 
-          // Print individual cells.
-          buf.setLength(0);
-          if (!importformat) {
-            buf.append("  ");
-          }
-          for (final KeyValue kv : row) {
-            // Discard everything or keep initial spaces.
-            buf.setLength(importformat ? 0 : 2);
-            formatKeyValue(buf, tsdb, importformat, kv, base_time, metric);
-            buf.append('\n');
-            System.out.print(buf);
-          }
+          //// Print individual cells.
+          //buf.setLength(0);
+          //if (!importformat) {
+            //buf.append("  ");
+          //}
+          //for (final KeyValue kv : row) {
+            //// Discard everything or keep initial spaces.
+            //buf.setLength(importformat ? 0 : 2);
+            //formatKeyValue(buf, tsdb, importformat, kv, base_time, metric);
+            //buf.append('\n');
+            //System.out.print(buf);
+          //}
 
-          if (delete) {
-            final DeleteRequest del = new DeleteRequest(table, key);
-            client.delete(del);
-          }
-        }
-      }
-    }
-  }
+          //if (delete) {
+            //final DeleteRequest del = new DeleteRequest(table, key);
+            //client.delete(del);
+          //}
+        //}
+      //}
+    //}
+  //}
 
   static void formatKeyValue(final StringBuilder buf,
                              final TSDB tsdb,

@@ -39,7 +39,7 @@ import net.opentsdb.stats.StatsCollector;
  * This class is the central class of OpenTSDB.  You use it to add new data
  * points or query the database.
  */
-public final class TSDBImpl implements TSDB{
+public final class TsdbHbase implements TSDB{
 
   static final byte[] FAMILY = { 't' };
 
@@ -85,7 +85,7 @@ public final class TSDBImpl implements TSDB{
    * @param uniqueids_table The name of the HBase table where the unique IDs
    * are stored.
    */
-  public TSDBImpl(final HBaseClient client,
+  public TsdbHbase(final HBaseClient client,
               final String timeseries_table,
               final String uniqueids_table) {
     this.client = client;
@@ -156,7 +156,7 @@ public final class TSDBImpl implements TSDB{
 
     collector.addExtraTag("class", "TsdbQuery");
     try {
-      collector.record("hbase.latency", TsdbQuery.scanlatency, "method=scan");
+      collector.record("hbase.latency", StorageQueryHbase.scanlatency, "method=scan");
     } finally {
       collector.clearExtraTag("class");
     }
@@ -176,7 +176,7 @@ public final class TSDBImpl implements TSDB{
 
   /** Returns a latency histogram for Scan RPCs used to fetch data points.  */
   public Histogram getScanLatencyHistogram() {
-    return TsdbQuery.scanlatency;
+    return StorageQueryHbase.scanlatency;
   }
 
   /**
@@ -195,7 +195,9 @@ public final class TSDBImpl implements TSDB{
    * Returns a new {@link Query} instance suitable for this TSDB.
    */
   public Query newQuery() {
-    return new TsdbQuery(this);
+    TsdbQuery query = new TsdbQuery(this);
+    query.setStorageQuery(new StorageQueryHbase(this));
+    return query;
   }
 
   /**

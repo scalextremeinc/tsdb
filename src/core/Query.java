@@ -14,8 +14,6 @@ package net.opentsdb.core;
 
 import java.util.Map;
 
-import org.hbase.async.HBaseException;
-
 import net.opentsdb.uid.NoSuchUniqueName;
 
 /**
@@ -102,6 +100,6 @@ public interface Query {
    * @throws HBaseException if there was a problem communicating with HBase to
    * perform the search.
    */
-  DataPoints[] run() throws HBaseException;
+  DataPoints[] run() throws StorageException;
 
 }

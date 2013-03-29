@@ -33,7 +33,7 @@ import org.hbase.async.PutRequest;
 
 import net.opentsdb.core.Tags;
 import net.opentsdb.core.TSDB;
-import net.opentsdb.core.TSDBImpl;
+import net.opentsdb.core.TsdbHbase;
 import net.opentsdb.core.WritableDataPoints;
 import net.opentsdb.stats.StatsCollector;
 
@@ -63,7 +63,7 @@ final class TextImporter {
     final HBaseClient client = CliOptions.clientFromOptions(argp);
     // Flush more frequently since we read very fast from the files.
     client.setFlushInterval((short) 500);  // ms
-    final TSDB tsdb = new TSDBImpl(client, argp.get("--table", "tsdb"),
+    final TSDB tsdb = new TsdbHbase(client, argp.get("--table", "tsdb"),
                                argp.get("--uidtable", "tsdb-uid"));
     argp = null;
     try {
