@@ -21,3 +21,12 @@ $(C3P0): $(C3P0).md5
 	set dummy "$(C3P0_BASE_URL)" "$(C3P0)"; shift; $(FETCH_DEPENDENCY)
 
 THIRD_PARTY += $(C3P0)
+
+MCHANGE_COMMONS_VERSION := 0.2.3.3
+MCHANGE_COMMONS := third_party/c3p0/mchange-commons-java-$(MCHANGE_COMMONS_VERSION).jar
+MCHANGE_COMMONS_BASE_URL := http://repo1.maven.org/maven2/com/mchange/mchange-commons-java/$(MCHANGE_COMMONS_VERSION)
+
+$(MCHANGE_COMMONS): $(MCHANGE_COMMONS).md5
+	set dummy "$(MCHANGE_COMMONS_BASE_URL)" "$(MCHANGE_COMMONS)"; shift; $(FETCH_DEPENDENCY)
+
+THIRD_PARTY += $(MCHANGE_COMMONS)

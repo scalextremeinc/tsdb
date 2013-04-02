@@ -22,6 +22,9 @@ import org.jboss.netty.logging.Slf4JLoggerFactory;
 
 import org.hbase.async.HBaseClient;
 
+import javax.sql.DataSource;
+import net.opentsdb.core.sql.DataSourceUtil;
+
 /** Helper functions to parse arguments passed to {@code main}.  */
 final class CliOptions {
 
@@ -103,5 +106,18 @@ final class CliOptions {
       return new HBaseClient(zkq);
     }
   }
+  
+  static DataSource dsFromOptions(final ArgP argp) {
+    if (argp.optionExists("--auto-metric") && argp.has("--auto-metric")) {
+      System.setProperty("tsd.core.auto_create_metrics", "true");
+    }
+    final String host = argp.get("--dbhost", "localhost");
+    final String user = argp.get("--dbuser", "tsdb");
+    final String pass = argp.get("--dbpass", "tsdb");
+    final String db = argp.get("--dbname", "tsdb");
+    
+    return DataSourceUtil.createPooledDataSource(host, user, pass, db);
+  }
+
 
 }

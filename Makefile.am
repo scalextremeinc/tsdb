@@ -54,6 +54,7 @@ tsdb_SRC := \
 	src/core/TsdbQuery.java	\
 	src/core/WritableDataPoints.java	\
 	src/core/sql/TsdbSql.java	\
+	src/core/sql/DataSourceUtil.java \
 	src/graph/Plot.java	\
 	src/stats/Histogram.java	\
 	src/stats/StatsCollector.java	\
@@ -94,6 +95,8 @@ tsdb_DEPS = \
 	$(SLF4J_API)	\
 	$(SUASYNC)	\
 	$(C3P0)	\
+	$(MCHANGE_COMMONS) \
+	$(MYSQL) \
 	$(ZOOKEEPER)
 
 # Install all the .jar files in pkgdatadir.

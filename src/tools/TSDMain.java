@@ -16,6 +16,8 @@ import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executors;
 
+import javax.sql.DataSource;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +29,7 @@ import org.hbase.async.HBaseClient;
 import net.opentsdb.BuildData;
 import net.opentsdb.core.TSDB;
 import net.opentsdb.core.TsdbHbase;
+import net.opentsdb.core.sql.TsdbSql;
 import net.opentsdb.tsd.PipelineFactory;
 
 /**
@@ -97,6 +100,12 @@ final class TSDMain {
     argp.addOption("--flush-interval", "MSEC",
                    "Maximum time for which a new data point can be buffered"
                    + " (default: " + DEFAULT_FLUSH_INTERVAL + ").");
+    // sql               
+    argp.addOption("--dbhost", "DB_HOST", "Sql db host");
+    argp.addOption("--dbuser", "DB_USER", "Sql db user");
+    argp.addOption("--dbpass", "DB_PASS", "Sql db pass");
+    argp.addOption("--dbname", "DB_NAME", "Sql db name");
+    
     CliOptions.addAutoMetricFlag(argp);
     args = CliOptions.parse(argp, args);
     if (args == null || !argp.has("--port")
@@ -118,15 +127,17 @@ final class TSDMain {
         new NioServerSocketChannelFactory(Executors.newCachedThreadPool(),
                                           Executors.newCachedThreadPool());
     final HBaseClient client = CliOptions.clientFromOptions(argp);
+    final DataSource ds = CliOptions.dsFromOptions(argp);
     try {
       // Make sure we don't even start if we can't find out tables.
-      final String table = argp.get("--table", "tsdb");
-      final String uidtable = argp.get("--uidtable", "tsdb-uid");
-      client.ensureTableExists(table).joinUninterruptibly();
-      client.ensureTableExists(uidtable).joinUninterruptibly();
+      //final String table = argp.get("--table", "tsdb");
+      //final String uidtable = argp.get("--uidtable", "tsdb-uid");
+      //client.ensureTableExists(table).joinUninterruptibly();
+      //client.ensureTableExists(uidtable).joinUninterruptibly();
 
-      client.setFlushInterval(flush_interval);
-      final TSDB tsdb = new TsdbHbase(client, table, uidtable);
+      //client.setFlushInterval(flush_interval);
+      //final TSDB tsdb = new TsdbHbase(client, table, uidtable);
+      final TSDB tsdb = new TsdbSql(ds);
       registerShutdownHook(tsdb);
       final ServerBootstrap server = new ServerBootstrap(factory);
 

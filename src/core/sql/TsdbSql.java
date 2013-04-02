@@ -1,59 +1,114 @@
 package net.opentsdb.core.sql;
 
+import java.util.List;
 import java.util.Map;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
+
+import javax.sql.DataSource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.sql.DataSource;
-import com.mchange.v2.c3p0.ComboPooledDataSource;
-import java.beans.PropertyVetoException;
+import com.stumbleupon.async.Deferred;
 
-public final class TsdbSql {
+import net.opentsdb.uid.UniqueIdInterface;
+import net.opentsdb.stats.Histogram;
+import net.opentsdb.stats.StatsCollector;
+
+import net.opentsdb.core.TSDB;
+import net.opentsdb.core.Query;
+import net.opentsdb.core.WritableDataPoints;
+
+public final class TsdbSql implements TSDB {
     
     private static final Logger LOG = LoggerFactory.getLogger(TsdbSql.class);
     
     private DataSource ds;
     
-    public TsdbSql(String host, String user, String pass, String db) {
-        ds = createDataSource(host, user, pass, db);
+    public TsdbSql(DataSource ds) {
+        this.ds = ds;
     }
     
-    private DataSource createDataSource(String host, String user, String pass, String db) {
-        ComboPooledDataSource cpds = new ComboPooledDataSource();
-        try {
-            cpds.setDriverClass("com.mysql.jdbc.Driver");
-        } catch (PropertyVetoException e) {
-            LOG.error("Unable to set dirver class: " + e.getMessage());
-        }
-        cpds.setJdbcUrl("jdbc:mysql://" + host + "/" + db);
-        cpds.setUser(user);
-        cpds.setPassword(pass);
-        
-        // pool settings
-        cpds.setMinPoolSize(5);                                     
-        cpds.setAcquireIncrement(5);
-        cpds.setMaxPoolSize(20);
-        
-        return cpds;
-    }
-    
-    public void addPoint(String metric, long timestamp, long value, Map<String, String> tags) {
-        LOG.error("SQL add point");
+    public Deferred<Object> addPoint(String metric, long timestamp, long value, Map<String, String> tags) {
+        LOG.info("SQL add point long");
         try {
             Connection conn = ds.getConnection();
             
         } catch (SQLException e) {
             LOG.error("Unable to get sql db connection: " + e.getMessage());
         }
+        return null;
     }
     
-    public void addPoint(String metric, long timestamp, float value, Map<String, String> tags) {
-        LOG.error("SQL add point");
+    public Deferred<Object> addPoint(String metric, long timestamp, float value, Map<String, String> tags) {
+        LOG.info("SQL add point float");
+        return null;
+    }
+    
+    public UniqueIdInterface getMetrics() {
+        return null;
+    }
+
+    public UniqueIdInterface getTagNames() {
+        return null;
+    }
+
+    public UniqueIdInterface getTagValues() {
+        return null;
+    }
+
+    public int uidCacheHits() {
+        return 0;
+    }
+
+    public int uidCacheMisses() {
+        return 0;
+    }
+
+    public int uidCacheSize() {
+        return 0;
+    }
+
+    public void collectStats(final StatsCollector collector) {
+        
+    }
+
+    public Histogram getPutLatencyHistogram() {
+        return null;
+    }
+
+    public Histogram getScanLatencyHistogram() {
+        return null;
+    }
+
+    public Query newQuery() {
+        return null;
+    }
+
+    public WritableDataPoints newDataPoints() {
+        return null;
+    }
+
+    public Deferred<Object> flush() throws Exception {
+        return null;
+    }
+
+    public Deferred<Object> shutdown() {
+        return null;
+    }
+
+    public List<String> suggestMetrics(final String search) {
+        return null;
+    }
+
+    public List<String> suggestTagNames(final String search) {
+        return null;
+    }
+
+    public List<String> suggestTagValues(final String search) {
+        return null;
     }
     
 }
