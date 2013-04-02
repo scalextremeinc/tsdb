@@ -83,7 +83,8 @@ tsdb_SRC := \
 	src/uid/NoSuchUniqueId.java	\
 	src/uid/NoSuchUniqueName.java	\
 	src/uid/UniqueId.java	\
-	src/uid/UniqueIdInterface.java
+	src/uid/UniqueIdInterface.java \
+	src/uid/sql/UniqueIdSql.java
 
 tsdb_DEPS = \
 	$(ASYNCHBASE)	\

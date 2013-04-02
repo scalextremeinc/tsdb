@@ -21,30 +21,45 @@ import net.opentsdb.core.TSDB;
 import net.opentsdb.core.Query;
 import net.opentsdb.core.WritableDataPoints;
 
+import net.opentsdb.uid.sql.UniqueIdSql;
+
 public final class TsdbSql implements TSDB {
     
     private static final Logger LOG = LoggerFactory.getLogger(TsdbSql.class);
     
     private DataSource ds;
     
+    final public UniqueIdSql metrics;
+    final public UniqueIdSql tag_names;
+    final public UniqueIdSql tag_values;
+    final public UniqueIdSql hosts;
+    
     public TsdbSql(DataSource ds) {
         this.ds = ds;
+        metrics = new UniqueIdSql(ds, "metric");
+        tag_names = new UniqueIdSql(ds, "tagk");
+        tag_values = new UniqueIdSql(ds, "tagv");
+        hosts = new UniqueIdSql(ds, "host");
     }
     
     public Deferred<Object> addPoint(String metric, long timestamp, long value, Map<String, String> tags) {
         LOG.info("SQL add point long");
-        try {
-            Connection conn = ds.getConnection();
+        //try {
+            //Connection conn = ds.getConnection();
             
-        } catch (SQLException e) {
-            LOG.error("Unable to get sql db connection: " + e.getMessage());
-        }
-        return null;
+            byte[] id = metrics.getOrCreateId(metric);
+            
+            LOG.info("METRIC ID: " + id);
+            
+        //} catch (SQLException e) {
+        //    LOG.error("Unable to get sql db connection: " + e.getMessage());
+        //}
+        return new Deferred<Object>();
     }
     
     public Deferred<Object> addPoint(String metric, long timestamp, float value, Map<String, String> tags) {
         LOG.info("SQL add point float");
-        return null;
+        return new Deferred<Object>();
     }
     
     public UniqueIdInterface getMetrics() {
