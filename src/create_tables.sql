@@ -27,8 +27,9 @@ CREATE TABLE `tsdb` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `val_int` bigint(20) unsigned,
   `val_dbl` double(20,4),
+  `ts` bigint NOT NULL,
   `metricid` bigint unsigned NOT NULL,
-  `hostid` bigint unsigned NOT NULL,
+  `hostid` bigint unsigned,
    PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

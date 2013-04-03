@@ -3,9 +3,14 @@ package net.opentsdb.core.sql;
 import java.util.List;
 import java.util.Map;
 
+import java.nio.ByteBuffer;
+
 import java.sql.Connection;
 import java.sql.SQLException;
-
+import java.sql.Types;
+import java.sql.Statement;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import javax.sql.DataSource;
 
 import org.slf4j.Logger;
@@ -29,49 +34,128 @@ public final class TsdbSql implements TSDB {
     
     private DataSource ds;
     
-    final public UniqueIdSql metrics;
-    final public UniqueIdSql tag_names;
-    final public UniqueIdSql tag_values;
-    final public UniqueIdSql hosts;
+    private final UniqueIdSql metrics;
+    private final UniqueIdSql tag_names;
+    private final UniqueIdSql tag_values;
+    private final UniqueIdSql hosts;
     
-    public TsdbSql(DataSource ds) {
+    private final String table_tsdb;
+    private final String table_tsdbtag;
+    
+    private final String insert_int_query;
+    private final String insert_double_query;
+    private final String insert_tag_query;
+    
+    public TsdbSql(DataSource ds, String table_prefix) {
         this.ds = ds;
-        metrics = new UniqueIdSql(ds, "metric");
-        tag_names = new UniqueIdSql(ds, "tagk");
-        tag_values = new UniqueIdSql(ds, "tagv");
-        hosts = new UniqueIdSql(ds, "host");
+        metrics = new UniqueIdSql(ds, addPrefix(table_prefix, "metric"));
+        tag_names = new UniqueIdSql(ds, addPrefix(table_prefix, "tagk"));
+        tag_values = new UniqueIdSql(ds, addPrefix(table_prefix, "tagv"));
+        hosts = new UniqueIdSql(ds, addPrefix(table_prefix, "host"));
+        table_tsdb = addPrefix(table_prefix, "tsdb");
+        table_tsdbtag = addPrefix(table_prefix, "tsdbtag");
+        insert_int_query = "INSERT INTO " + table_tsdb + " (val_int, ts, metricid, hostid) VALUES (?, ?, ?, ?)";
+        insert_double_query = "INSERT INTO " + table_tsdb + " (val_dbl, ts, metricid, hostid) VALUES (?, ?, ?, ?)";
+        insert_tag_query = "INSERT INTO " + table_tsdbtag + " VALUES (?, ?, ?)";
     }
     
-    public Deferred<Object> addPoint(String metric, long timestamp, long value, Map<String, String> tags) {
-        LOG.info("SQL add point long");
-        //try {
-            //Connection conn = ds.getConnection();
-            
-            byte[] id = metrics.getOrCreateId(metric);
-            
-            LOG.info("METRIC ID: " + id);
-            
-        //} catch (SQLException e) {
-        //    LOG.error("Unable to get sql db connection: " + e.getMessage());
-        //}
+    private String addPrefix(String prefix, String name) {
+        if (prefix != null) {
+            return prefix + name;
+        }
+        return name;
+    }
+    
+    public Deferred<Object> addPoint(String metric, long timestamp,
+            long value, Map<String, String> tags) {
+        addPoint(metric, timestamp, tags, null, new Long(value));
         return new Deferred<Object>();
     }
     
     public Deferred<Object> addPoint(String metric, long timestamp, float value, Map<String, String> tags) {
-        LOG.info("SQL add point float");
+        addPoint(metric, timestamp, tags, new Float(value), null);
         return new Deferred<Object>();
     }
     
+    private void addPoint(String metric, long timestamp, Map<String, String> tags,
+            Float val_dbl, Long val_int) {
+        byte[] metric_id = metrics.getOrCreateId(metric);
+        String host = tags.remove("host");
+        byte[] host_id = null;
+        if (host != null) {
+            host_id = hosts.getOrCreateId(host);
+        }
+        
+        String insert_query = insert_double_query;
+        if (val_int != null) {
+            insert_query = insert_int_query;
+        }
+        
+        Connection conn = null;
+        PreparedStatement st = null;
+        ResultSet rs = null;
+        try {
+            conn = ds.getConnection();
+            conn.setAutoCommit(false);
+            long id;
+            try {
+                st = conn.prepareStatement(insert_query, Statement.RETURN_GENERATED_KEYS);
+                if (val_dbl != null)
+                    st.setDouble(1, val_dbl);
+                else
+                    st.setLong(1, val_int);
+                st.setLong(2, timestamp);
+                st.setLong(3, toLong(metric_id));
+                if (host_id != null)
+                    st.setLong(4, toLong(host_id));
+                else
+                    st.setNull(4, Types.INTEGER);
+                st.executeUpdate();
+                
+                rs = st.getGeneratedKeys();
+                rs.next();
+                id = rs.getLong(1);
+            } finally {
+                DataSourceUtil.close(rs, st, null);
+            }
+            byte[] tagk = null;
+            byte[] tagv = null;
+            for (Map.Entry<String, String> entry : tags.entrySet()) {
+                tagk = tag_names.getOrCreateId(entry.getKey());
+                tagv = tag_values.getOrCreateId(entry.getValue());
+                if (tagk != null && tagv != null)
+                    try {
+                        st = conn.prepareStatement(insert_tag_query);
+                        st.setLong(1, id);
+                        st.setLong(2, toLong(tagk));
+                        st.setLong(3, toLong(tagv));
+                        st.executeUpdate();
+                    } finally {
+                        st.close();
+                    }
+            }
+            conn.commit();
+        } catch (SQLException e) {
+            LOG.error("Unable to get sql db connection: " + e.getMessage());
+        } finally {
+            DataSourceUtil.close(rs, st, conn);
+        }
+    }
+    
+    private long toLong(byte[] bytes) {
+        return ByteBuffer.allocate(8).put(bytes).getLong(0);
+    }
+    
     public UniqueIdInterface getMetrics() {
-        return null;
+        return metrics;
     }
 
     public UniqueIdInterface getTagNames() {
-        return null;
+        return tag_names;
     }
 
     public UniqueIdInterface getTagValues() {
-        return null;
+        return tag_values;
     }
 
     public int uidCacheHits() {

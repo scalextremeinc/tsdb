@@ -137,7 +137,7 @@ final class TSDMain {
 
       //client.setFlushInterval(flush_interval);
       //final TSDB tsdb = new TsdbHbase(client, table, uidtable);
-      final TSDB tsdb = new TsdbSql(ds);
+      final TSDB tsdb = new TsdbSql(ds, null);
       registerShutdownHook(tsdb);
       final ServerBootstrap server = new ServerBootstrap(factory);
 

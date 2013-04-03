@@ -185,7 +185,7 @@ public final class UniqueIdSql implements UniqueIdInterface {
     }
     
     private String getNameFromDb(final byte[] id) {
-        long idl = ByteBuffer.allocate(8).put(id).getLong();
+        long idl = ByteBuffer.allocate(8).put(id).getLong(0);
         Connection conn = null;
         PreparedStatement st = null;
         ResultSet rs = null;
@@ -194,8 +194,8 @@ public final class UniqueIdSql implements UniqueIdInterface {
             st = conn.prepareStatement(select_name_query);
             st.setLong(1, idl);
             rs = st.executeQuery();
-            if (rs.first()) {
-                return rs.getString(0);
+            if (rs.next()) {
+                return rs.getString(1);
             }
         } catch (SQLException e) {
             LOG.error("Unable to get name: " + e.getMessage());
@@ -214,8 +214,8 @@ public final class UniqueIdSql implements UniqueIdInterface {
             st = conn.prepareStatement(select_id_query);
             st.setString(1, name);
             rs = st.executeQuery();
-            if (rs.first()) {
-                long id = rs.getLong(0);
+            if (rs.next()) {
+                long id = rs.getLong(1);
                 return ByteBuffer.allocate(8).putLong(id).array();
             }
         } catch (SQLException e) {
