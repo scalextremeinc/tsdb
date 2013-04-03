@@ -1,6 +1,6 @@
 package net.opentsdb.core;
 
-class StorageException extends RuntimeException {
+public class StorageException extends RuntimeException {
 
   public StorageException(final String message) {
       super(message);

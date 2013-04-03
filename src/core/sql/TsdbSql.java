@@ -24,6 +24,7 @@ import net.opentsdb.stats.StatsCollector;
 
 import net.opentsdb.core.TSDB;
 import net.opentsdb.core.Query;
+import net.opentsdb.core.TsdbQuery;
 import net.opentsdb.core.WritableDataPoints;
 
 import net.opentsdb.uid.sql.UniqueIdSql;
@@ -80,7 +81,7 @@ public final class TsdbSql implements TSDB {
     private void addPoint(String metric, long timestamp, Map<String, String> tags,
             Float val_dbl, Long val_int) {
         byte[] metric_id = metrics.getOrCreateId(metric);
-        String host = tags.remove("host");
+        String host = tags.get("host");
         byte[] host_id = null;
         if (host != null) {
             host_id = hosts.getOrCreateId(host);
@@ -105,9 +106,9 @@ public final class TsdbSql implements TSDB {
                 else
                     st.setLong(1, val_int);
                 st.setLong(2, timestamp);
-                st.setLong(3, toLong(metric_id));
+                st.setLong(3, DataSourceUtil.toLong(metric_id));
                 if (host_id != null)
-                    st.setLong(4, toLong(host_id));
+                    st.setLong(4, DataSourceUtil.toLong(host_id));
                 else
                     st.setNull(4, Types.INTEGER);
                 st.executeUpdate();
@@ -121,14 +122,17 @@ public final class TsdbSql implements TSDB {
             byte[] tagk = null;
             byte[] tagv = null;
             for (Map.Entry<String, String> entry : tags.entrySet()) {
+                if ("host".equals(entry.getKey())) {
+                    continue;
+                }
                 tagk = tag_names.getOrCreateId(entry.getKey());
                 tagv = tag_values.getOrCreateId(entry.getValue());
                 if (tagk != null && tagv != null)
                     try {
                         st = conn.prepareStatement(insert_tag_query);
                         st.setLong(1, id);
-                        st.setLong(2, toLong(tagk));
-                        st.setLong(3, toLong(tagv));
+                        st.setLong(2, DataSourceUtil.toLong(tagk));
+                        st.setLong(3, DataSourceUtil.toLong(tagv));
                         st.executeUpdate();
                     } finally {
                         st.close();
@@ -142,10 +146,6 @@ public final class TsdbSql implements TSDB {
         }
     }
     
-    private long toLong(byte[] bytes) {
-        return ByteBuffer.allocate(8).put(bytes).getLong(0);
-    }
-    
     public UniqueIdInterface getMetrics() {
         return metrics;
     }
@@ -156,6 +156,10 @@ public final class TsdbSql implements TSDB {
 
     public UniqueIdInterface getTagValues() {
         return tag_values;
+    }
+    
+    public UniqueIdInterface getHosts() {
+        return hosts;
     }
 
     public int uidCacheHits() {
@@ -183,7 +187,9 @@ public final class TsdbSql implements TSDB {
     }
 
     public Query newQuery() {
-        return null;
+        TsdbQuery query = new TsdbQuery(this);
+        query.setStorageQuery(new StorageQuerySql(this, ds, table_tsdb, table_tsdbtag));
+        return query;
     }
 
     public WritableDataPoints newDataPoints() {

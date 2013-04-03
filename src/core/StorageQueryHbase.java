@@ -1,6 +1,7 @@
 package net.opentsdb.core;
 
 import java.util.List;
+import java.util.Map;
 import java.util.ArrayList;
 import java.util.TreeMap;
 import java.util.HashMap;
@@ -25,6 +26,9 @@ public class StorageQueryHbase implements StorageQuery {
     
   private static final Logger LOG = LoggerFactory.getLogger(StorageQueryHbase.class);
   
+  /** Used whenever there are no results. */
+  private static final DataPoints[] NO_RESULT = new DataPoints[0];
+  
   /**
    * Keep track of the latency we perceive when doing Scans on HBase.
    * We want buckets up to 16s, with 2 ms interval between each bucket up to
@@ -41,6 +45,12 @@ public class StorageQueryHbase implements StorageQuery {
   private ArrayList<byte[]> tags;
   private ArrayList<byte[]> group_bys;
   private ByteMap<byte[][]> group_by_values;
+  private boolean rate;
+  private Aggregator aggregator;
+  private Aggregator downsampler;
+  private int sample_interval;
+  private Map<byte[], Boolean> plus_aggregate = new HashMap<byte[], Boolean>();
+  private Map<String, String> extra_tags;
   
   public StorageQueryHbase(TsdbHbase tsdb) {
       this.tsdb = tsdb;
@@ -70,6 +80,112 @@ public class StorageQueryHbase implements StorageQuery {
       this.group_by_values = group_by_values;
   }
   
+  public void setRate(boolean rate) {
+      this.rate = rate;
+  }
+  
+  public void serAggregator(Aggregator aggregator) {
+      this.aggregator = aggregator;
+  }
+  
+  public void setDownsampler(Aggregator downsampler) {
+      this.downsampler = downsampler;
+  }
+  
+  public void setSampleInterval(int sample_interval) {
+      this.sample_interval = sample_interval;
+  }
+  
+  public void setPlusAggregate(Map<byte[], Boolean> plus_aggregate) {
+      this.plus_aggregate = plus_aggregate;
+  }
+  
+  public void setExtraTags(Map<String, String> extra_tags) {
+      this.extra_tags = extra_tags;
+  }
+  
+  public DataPoints[] runQuery() throws StorageException {
+      return groupByAndAggregate(findSpans());
+  }
+  
+  /**
+   * Creates the {@link SpanGroup}s to form the final results of this query.
+   * @param spans The {@link Span}s found for this query ({@link #findSpans}).
+   * Can be {@code null}, in which case the array returned will be empty.
+   * @return A possibly empty array of {@link SpanGroup}s built according to
+   * any 'GROUP BY' formulated in this query.
+   */
+  private DataPoints[] groupByAndAggregate(final TreeMap<byte[], Span> spans) {
+    if (spans == null || spans.size() <= 0) {
+      return NO_RESULT;
+    }
+    if (group_bys == null) {
+      // We haven't been asked to find groups, so let's put all the spans
+      // together in the same group.
+      final SpanGroup group = new SpanGroup(tsdb, start_time, end_time,
+        spans.values(), rate, aggregator, sample_interval, downsampler);
+      return new SpanGroup[] { group };
+    }
+
+    // Maps group value IDs to the SpanGroup for those values.  Say we've
+    // been asked to group by two things: foo=* bar=* Then the keys in this
+    // map will contain all the value IDs combinations we've seen.  If the
+    // name IDs for `foo' and `bar' are respectively [0, 0, 7] and [0, 0, 2]
+    // then we'll have group_bys=[[0, 0, 2], [0, 0, 7]] (notice it's sorted
+    // by ID, so bar is first) and say we find foo=LOL bar=OMG as well as
+    // foo=LOL bar=WTF and that the IDs of the tag values are:
+    //   LOL=[0, 0, 1]  OMG=[0, 0, 4]  WTF=[0, 0, 3]
+    // then the map will have two keys:
+    //   - one for the LOL-OMG combination: [0, 0, 1, 0, 0, 4] and,
+    //   - one for the LOL-WTF combination: [0, 0, 1, 0, 0, 3].
+    final ByteMap<SpanGroup> groups = new ByteMap<SpanGroup>();
+    final short value_width = tsdb.getTagValues().width();
+    final byte[] group = new byte[group_bys.size() * value_width];
+    for (final Map.Entry<byte[], Span> entry : spans.entrySet()) {
+      final byte[] row = entry.getKey();
+      byte[] value_id = null;
+      int i = 0;
+      // TODO(tsuna): The following loop has a quadratic behavior.  We can
+      // make it much better since both the row key and group_bys are sorted.
+      for (final byte[] tag_id : group_bys) {
+    	Boolean is_plus_aggregate = plus_aggregate.get(tag_id);
+    	if (is_plus_aggregate != null && is_plus_aggregate) {
+    		value_id = tag_id;
+    	} else {
+    		value_id = Tags.getValueId(tsdb, row, tag_id);
+    	}
+        if (value_id == null) {
+          break;
+        }
+        System.arraycopy(value_id, 0, group, i, value_width);
+        i += value_width;
+      }
+      if (value_id == null) {
+        LOG.error("WTF?  Dropping span for row " + Arrays.toString(row)
+                 + " as it had no matching tag from the requested groups,"
+                 + " which is unexpected.  Query=" + this);
+        continue;
+      }
+      //LOG.info("Span belongs to group " + Arrays.toString(group) + ": " + Arrays.toString(row));
+      SpanGroup thegroup = groups.get(group);
+      if (thegroup == null) {
+        thegroup = new SpanGroup(tsdb, start_time, end_time,
+            null, rate, aggregator, sample_interval, downsampler);
+        thegroup.setExtraTags(extra_tags);
+        // Copy the array because we're going to keep `group' and overwrite
+        // its contents.  So we want the collection to have an immutable copy.
+        final byte[] group_copy = new byte[group.length];
+        System.arraycopy(group, 0, group_copy, 0, group.length);
+        groups.put(group_copy, thegroup);
+      }
+      thegroup.add(entry.getValue());
+    }
+    //for (final Map.Entry<byte[], SpanGroup> entry : groups) {
+    //  LOG.info("group for " + Arrays.toString(entry.getKey()) + ": " + entry.getValue());
+    //}
+    return groups.values().toArray(new SpanGroup[groups.size()]);
+  }
+  
   /**
    * Finds all the {@link Span}s that match this query.
    * This is what actually scans the HBase table and loads the data into
@@ -81,7 +197,7 @@ public class StorageQueryHbase implements StorageQuery {
    * perform the search.
    * @throws IllegalArgumentException if bad data was retreived from HBase.
    */
-  public TreeMap<byte[], Span> findSpans() throws StorageException {
+  private TreeMap<byte[], Span> findSpans() throws StorageException {
     final short metric_width = tsdb.metrics.width();
     final TreeMap<byte[], Span> spans =  // The key is a row key from HBase.
       new TreeMap<byte[], Span>(new SpanCmp(metric_width));

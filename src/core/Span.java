@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * <p>
  * This class stores a continuous sequence of {@link SpanView}s in memory.
  */
-final class Span implements DataPoints {
+final public class Span implements DataPoints {
 
   private static final Logger LOG = LoggerFactory.getLogger(Span.class);
 

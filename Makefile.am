@@ -55,6 +55,7 @@ tsdb_SRC := \
 	src/core/WritableDataPoints.java	\
 	src/core/sql/TsdbSql.java	\
 	src/core/sql/DataSourceUtil.java \
+	src/core/sql/StorageQuerySql.java \
 	src/graph/Plot.java	\
 	src/stats/Histogram.java	\
 	src/stats/StatsCollector.java	\
