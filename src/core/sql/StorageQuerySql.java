@@ -31,7 +31,7 @@ public class StorageQuerySql implements StorageQuery {
     private DataSource ds;
     private final String table_tsdb;
     private final String table_tsdbtag;
-    private final String query_base;
+    private byte[] host_name_id;
     
     private byte[] metric;
     private long start_time;
@@ -51,8 +51,6 @@ public class StorageQuerySql implements StorageQuery {
         this.ds = ds;
         this.table_tsdb = table_tsdb;
         this.table_tsdbtag = table_tsdbtag;
-        query_base = "SELECT t.val_int,t.val_dbl,t.ts, g.tagkid,g.tagvid "
-            + "FROM " + table_tsdb + " as t, " + table_tsdbtag + " as g WHERE metricid=?";
     }
     
     public DataPoints[] runQuery() throws StorageException {
@@ -73,8 +71,12 @@ public class StorageQuerySql implements StorageQuery {
         query.append(" FROM " + table_tsdb + " as t");
         if (join_tags)
             query.append(", " + table_tsdbtag + " as g");
-        query.append(" WHERE metricid=");
+        query.append(" WHERE t.metricid=");
         query.append(DataSourceUtil.toLong(metric));
+        query.append(" AND t.ts >= ");
+        query.append(start_time);
+        query.append(" AND t.ts <= ");
+        query.append(end_time);
         if (join_tags)
             query.append(" AND t.id=g.tsdbid");
         query.append(host_condition);
@@ -190,7 +192,10 @@ public class StorageQuerySql implements StorageQuery {
     }
     
     private byte[] getHostId() {
-        return tsdb.getTagNames().getId("host");
+        if (host_name_id == null) {
+            host_name_id = tsdb.getTagNames().getId("host");
+        }
+        return host_name_id;
     }
     
     private void queryDb() {
