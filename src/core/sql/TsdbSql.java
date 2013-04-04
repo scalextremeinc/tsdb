@@ -38,7 +38,6 @@ public final class TsdbSql implements TSDB {
     private final UniqueIdSql metrics;
     private final UniqueIdSql tag_names;
     private final UniqueIdSql tag_values;
-    private final UniqueIdSql hosts;
     
     private final String table_tsdb;
     private final String table_tsdbtag;
@@ -52,7 +51,6 @@ public final class TsdbSql implements TSDB {
         metrics = new UniqueIdSql(ds, addPrefix(table_prefix, "metric"));
         tag_names = new UniqueIdSql(ds, addPrefix(table_prefix, "tagk"));
         tag_values = new UniqueIdSql(ds, addPrefix(table_prefix, "tagv"));
-        hosts = new UniqueIdSql(ds, addPrefix(table_prefix, "host"));
         table_tsdb = addPrefix(table_prefix, "tsdb");
         table_tsdbtag = addPrefix(table_prefix, "tsdbtag");
         insert_int_query = "INSERT INTO " + table_tsdb + " (val_int, ts, metricid, hostid) VALUES (?, ?, ?, ?)";
@@ -84,7 +82,9 @@ public final class TsdbSql implements TSDB {
         String host = tags.get("host");
         byte[] host_id = null;
         if (host != null) {
-            host_id = hosts.getOrCreateId(host);
+            host_id = tag_values.getOrCreateId(host);
+            // make sure host name tag id is created - used by query
+            tag_names.getOrCreateId("host");
         }
         
         String insert_query = insert_double_query;
@@ -107,9 +107,9 @@ public final class TsdbSql implements TSDB {
                     st.setLong(1, val_int);
                 st.setLong(2, timestamp);
                 st.setLong(3, DataSourceUtil.toLong(metric_id));
-                if (host_id != null)
+                if (host_id != null) {
                     st.setLong(4, DataSourceUtil.toLong(host_id));
-                else
+                } else
                     st.setNull(4, Types.INTEGER);
                 st.executeUpdate();
                 
@@ -158,10 +158,6 @@ public final class TsdbSql implements TSDB {
         return tag_values;
     }
     
-    public UniqueIdInterface getHosts() {
-        return hosts;
-    }
-
     public int uidCacheHits() {
         return 0;
     }
