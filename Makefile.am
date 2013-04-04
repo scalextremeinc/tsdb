@@ -32,6 +32,7 @@ tsdb_SRC := \
 	src/core/CompactionQueue.java	\
 	src/core/Const.java	\
 	src/core/DataPoint.java	\
+	src/core/DataPointImpl.java	\
 	src/core/DataPoints.java	\
 	src/core/DataPointsIterator.java	\
 	src/core/IncomingDataPoints.java	\
@@ -56,6 +57,7 @@ tsdb_SRC := \
 	src/core/sql/TsdbSql.java	\
 	src/core/sql/DataSourceUtil.java \
 	src/core/sql/StorageQuerySql.java \
+	src/core/sql/SpanViewSql.java \
 	src/graph/Plot.java	\
 	src/stats/Histogram.java	\
 	src/stats/StatsCollector.java	\

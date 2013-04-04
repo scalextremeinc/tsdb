@@ -43,7 +43,7 @@ import java.util.NoSuchElementException;
  * {@link Aggregator}) are given.  This is done by using a special
  * iterator when using the {@link Span.DownsamplingIterator}.
  */
-final class SpanGroup implements DataPoints {
+public final class SpanGroup implements DataPoints {
 
   /** Start time (UNIX timestamp in seconds) on 32 bits ("unsigned" int). */
   private final long start_time;
@@ -103,7 +103,7 @@ final class SpanGroup implements DataPoints {
    * @param downsampler Aggregation function to use to group data points
    * within an interval.
    */
-  SpanGroup(final TSDB tsdb,
+  public SpanGroup(final TSDB tsdb,
             final long start_time, final long end_time,
             final Iterable<Span> spans,
             final boolean rate,

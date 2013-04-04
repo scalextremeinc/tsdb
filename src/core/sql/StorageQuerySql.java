@@ -1,5 +1,6 @@
 package net.opentsdb.core.sql;
 
+import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
@@ -20,6 +21,9 @@ import static org.hbase.async.Bytes.ByteMap;
 import net.opentsdb.core.StorageQuery;
 import net.opentsdb.core.StorageException;
 import net.opentsdb.core.Span;
+import net.opentsdb.core.SpanGroup;
+import net.opentsdb.core.DataPoint;
+import net.opentsdb.core.DataPointImpl;
 import net.opentsdb.core.DataPoints;
 import net.opentsdb.core.Aggregator;
 
@@ -54,8 +58,10 @@ public class StorageQuerySql implements StorageQuery {
     }
     
     public DataPoints[] runQuery() throws StorageException {
-        queryDb();
-        return null;
+        List<Span> spans = queryDb();
+        SpanGroup group = new SpanGroup(tsdb, start_time, end_time,
+            spans, rate, aggregator, sample_interval, downsampler);
+        return new SpanGroup[] { group };
     }
     
     private String buildQuery() {
@@ -65,7 +71,7 @@ public class StorageQuerySql implements StorageQuery {
         boolean join_tags = buildHostCondition(host_condition);
         join_tags = buildTagsCondition(tags_condition) || join_tags;
 
-        StringBuilder query = new StringBuilder("SELECT t.val_int,t.val_dbl,t.ts,t.hostid");
+        StringBuilder query = new StringBuilder("SELECT t.id,t.val_int,t.val_dbl,t.ts,t.hostid");
         if (join_tags)
             query.append(",g.tagkid,g.tagvid");
         query.append(" FROM " + table_tsdb + " as t");
@@ -198,23 +204,46 @@ public class StorageQuerySql implements StorageQuery {
         return host_name_id;
     }
     
-    private void queryDb() {
+    private List<Span> queryDb() {
+        String query = buildQuery();
+        LOG.info("QUERY: " + query);
+        
+        List<Span> spans = new ArrayList<Span>();
+        
+        SpanViewSql span_view = new SpanViewSql(tsdb.getMetrics().getName(metric));
+        List<SpanViewSql> span_views = new ArrayList<SpanViewSql>();
+        span_views.add(span_view);
+        
         Connection conn = null;
         PreparedStatement st = null;
         ResultSet rs = null;
-        String query = buildQuery();
-        LOG.info("QUERY: " + query);
         try {
             conn = ds.getConnection();
             st = conn.prepareStatement(query);
             //st.setLong(1, DataSourceUtil.toLong(metric));
             rs = st.executeQuery();
-            
+            while (rs.next()) {
+                Long val_dbl = rs.getLong(3);
+                DataPoint point = null;
+                if (val_dbl != null)
+                    point = new DataPointImpl(rs.getLong(4), val_dbl);
+                else
+                    point = new DataPointImpl(rs.getLong(4), rs.getLong(2));
+                
+                span_view.addPoint(point);
+            }           
         } catch (SQLException e) {
             LOG.error("Unable to get results: " + e.getMessage());
         } finally {
             DataSourceUtil.close(rs, st, conn);
         }  
+        
+        Span sp = new Span();
+        sp.setSpanViews(span_views);
+        
+        spans.add(sp);
+        
+        return spans;
     }
     
     public void setMetric(byte[] metric) {
