@@ -223,9 +223,9 @@ public class StorageQuerySql implements StorageQuery {
             //st.setLong(1, DataSourceUtil.toLong(metric));
             rs = st.executeQuery();
             while (rs.next()) {
-                Long val_dbl = rs.getLong(3);
+                double val_dbl = rs.getDouble(3);
                 DataPoint point = null;
-                if (val_dbl != null)
+                if (!rs.wasNull())
                     point = new DataPointImpl(rs.getLong(4), val_dbl);
                 else
                     point = new DataPointImpl(rs.getLong(4), rs.getLong(2));
