@@ -7,3 +7,9 @@ build
 config.log
 config.status
 configure
+*.class
+
+# Package Files #
+*.jar
+*.war
+*.ear
