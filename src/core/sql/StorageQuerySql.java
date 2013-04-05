@@ -70,6 +70,8 @@ public class StorageQuerySql implements StorageQuery {
         
         boolean join_tags = buildHostCondition(host_condition);
         join_tags = buildTagsCondition(tags_condition) || join_tags;
+        
+        boolean group = join_tags && group_bys != null && group_bys.size() > 0;
 
         StringBuilder query = new StringBuilder("SELECT t.id,t.val_int,t.val_dbl,t.ts,t.hostid");
         if (join_tags)
@@ -86,10 +88,19 @@ public class StorageQuerySql implements StorageQuery {
         if (join_tags)
             query.append(" AND t.id=g.tsdbid");
         query.append(host_condition);
-        query.append(tags_condition);
         
-        if (join_tags && group_bys != null && group_bys.size() > 0)
-           buildGroupingCondition(query);
+        if (tags_condition.length() > 0 || group)
+            query.append(" AND (");
+            
+        query.append(tags_condition);
+        if (group) {
+            if (tags_condition.length() > 0)
+                query.append(" OR");
+            buildGroupingCondition(query);
+        }
+           
+        if (tags_condition.length() > 0 || group)
+           query.append(")");
         
         return query.toString();
     }
@@ -102,15 +113,23 @@ public class StorageQuerySql implements StorageQuery {
         int value_width = tsdb.getTagValues().width();
         byte[] name_id = new byte[name_width];
         byte[] value_id = new byte[value_width];
+        boolean empty = true;
         for (byte[] tag : tags) {
             System.arraycopy(tag, 0, name_id, 0, name_width);
             if (!Arrays.equals(name_id, host_id)) {
+                if (empty) {
+                    tags_condition.append(" (");
+                    empty = false;
+                } else {
+                    tags_condition.append(" OR (");
+                }
                 System.arraycopy(tag, name_width, value_id, 0, value_width);
-                tags_condition.append(" AND g.tagkid=");
+                tags_condition.append(" g.tagkid=");
                 tags_condition.append(DataSourceUtil.toLong(name_id));
                 tags_condition.append(" AND g.tagvid=");
                 tags_condition.append(DataSourceUtil.toLong(value_id));
                 join_tags = true;
+                tags_condition.append(")");
             }
         }
         
@@ -121,7 +140,6 @@ public class StorageQuerySql implements StorageQuery {
         // AND ( g.tagkid=? AND g.tagvid IN (17,18,19,20) OR ... )
         byte[] host_id = getHostId();
         byte[] group_by;
-        query.append(" AND (");
         for (int i = 0; i < group_bys.size(); i++) {
             group_by = group_bys.get(i);
             if (Arrays.equals(group_by, host_id))
@@ -145,7 +163,6 @@ public class StorageQuerySql implements StorageQuery {
             }
             query.append(")");
         }
-        query.append(")");
     }
     
     private boolean buildHostCondition(StringBuilder host_condition) {
@@ -231,7 +248,7 @@ public class StorageQuerySql implements StorageQuery {
                     point = new DataPointImpl(rs.getLong(4), rs.getLong(2));
                 
                 span_view.addPoint(point);
-            }           
+            }
         } catch (SQLException e) {
             LOG.error("Unable to get results: " + e.getMessage());
         } finally {
