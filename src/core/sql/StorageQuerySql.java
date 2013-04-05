@@ -1,10 +1,12 @@
 package net.opentsdb.core.sql;
 
 import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -36,6 +38,8 @@ public class StorageQuerySql implements StorageQuery {
     private final String table_tsdb;
     private final String table_tsdbtag;
     private byte[] host_name_id;
+    private Long host_name_idl;
+    private boolean join_tags = false;
     
     private byte[] metric;
     private long start_time;
@@ -59,16 +63,23 @@ public class StorageQuerySql implements StorageQuery {
     
     public DataPoints[] runQuery() throws StorageException {
         List<Span> spans = queryDb();
-        SpanGroup group = new SpanGroup(tsdb, start_time, end_time,
-            spans, rate, aggregator, sample_interval, downsampler);
-        return new SpanGroup[] { group };
+        List<SpanGroup> groups = new LinkedList<SpanGroup>();
+        for (Span s : spans) {
+            if (s.size() == 0)
+                continue;
+            SpanGroup group = new SpanGroup(tsdb, start_time, end_time,
+                null, rate, aggregator, sample_interval, downsampler);
+            group.add(s);
+            groups.add(group);
+        }
+        return groups.toArray(new SpanGroup[groups.size()]);
     }
     
     private String buildQuery() {
         StringBuilder host_condition = new StringBuilder();
         StringBuilder tags_condition = new StringBuilder();
         
-        boolean join_tags = buildHostCondition(host_condition);
+        join_tags = buildHostCondition(host_condition);
         join_tags = buildTagsCondition(tags_condition) || join_tags;
         
         boolean group = join_tags && group_bys != null && group_bys.size() > 0;
@@ -221,15 +232,19 @@ public class StorageQuerySql implements StorageQuery {
         return host_name_id;
     }
     
+    private long getHostIdl() {
+        if (host_name_idl == null) {
+            host_name_idl = DataSourceUtil.toLong(getHostId());
+        }
+        return host_name_idl;
+    }
+    
     private List<Span> queryDb() {
         String query = buildQuery();
         LOG.info("QUERY: " + query);
         
         List<Span> spans = new ArrayList<Span>();
-        
-        SpanViewSql span_view = new SpanViewSql(tsdb.getMetrics().getName(metric));
-        List<SpanViewSql> span_views = new ArrayList<SpanViewSql>();
-        span_views.add(span_view);
+        Map<List<Long>, SpanViewSql> span_views = new HashMap<List<Long>, SpanViewSql>();
         
         Connection conn = null;
         PreparedStatement st = null;
@@ -240,14 +255,7 @@ public class StorageQuerySql implements StorageQuery {
             //st.setLong(1, DataSourceUtil.toLong(metric));
             rs = st.executeQuery();
             while (rs.next()) {
-                double val_dbl = rs.getDouble(3);
-                DataPoint point = null;
-                if (!rs.wasNull())
-                    point = new DataPointImpl(rs.getLong(4), val_dbl);
-                else
-                    point = new DataPointImpl(rs.getLong(4), rs.getLong(2));
-                
-                span_view.addPoint(point);
+                updateSpan(spans, span_views, rs);
             }
         } catch (SQLException e) {
             LOG.error("Unable to get results: " + e.getMessage());
@@ -255,12 +263,83 @@ public class StorageQuerySql implements StorageQuery {
             DataSourceUtil.close(rs, st, conn);
         }  
         
-        Span sp = new Span();
-        sp.setSpanViews(span_views);
-        
-        spans.add(sp);
-        
         return spans;
+    }
+    
+    private DataPoint current_point;
+    private long current_point_id;
+    private List<Long> current_key;
+    
+    private void updateSpan(List<Span> spans, Map<List<Long>, SpanViewSql> span_views, ResultSet rs)
+            throws SQLException {
+        
+        if (current_key == null) {
+            current_key = createKey(rs);
+        }
+        
+        long point_id = rs.getLong(1);
+        
+        if (current_point == null) {
+            current_point = createPoint(rs);
+            current_point_id = point_id;
+        }
+        
+        if (current_point_id == point_id && join_tags) {
+            current_key.add(rs.getLong(6));
+            current_key.add(rs.getLong(7));
+        } else if (current_point_id != point_id) {
+            SpanViewSql span_view = span_views.get(current_key);
+            if (span_view == null) {
+                span_view = new SpanViewSql(tsdb.getMetrics().getName(metric));
+                // set tags
+                Iterator<Long> i = current_key.iterator();
+                while (i.hasNext()) {
+                    Long name_id = i.next();
+                    Long value_id = i.next();
+                    span_view.putTag(tsdb.getTagNames().getName(DataSourceUtil.toBytes(name_id)),
+                        tsdb.getTagValues().getName(DataSourceUtil.toBytes(value_id)));
+                }
+                
+                String current_key_str = "";
+                for (Long l : current_key)
+                    current_key_str += "_" + l;
+                LOG.info("new span view: " + span_view + ", key: " + current_key_str);
+               
+                span_views.put(current_key, span_view);
+                List<SpanViewSql> rows = new ArrayList<SpanViewSql>();
+                rows.add(span_view);
+                Span s = new Span();
+                s.setSpanViews(rows);
+                spans.add(s);
+            }
+            
+            span_view.addPoint(current_point);
+            
+            current_key = createKey(rs);
+            current_point = createPoint(rs);
+            current_point_id = point_id;
+            if (join_tags) {
+                current_key.add(rs.getLong(6));
+                current_key.add(rs.getLong(7));
+            }
+        }
+    }
+    
+    private DataPointImpl createPoint(ResultSet rs) throws SQLException {
+        double val_dbl = rs.getDouble(3);
+        if (!rs.wasNull())
+            return new DataPointImpl(rs.getLong(4), val_dbl);
+        else
+            return new DataPointImpl(rs.getLong(4), rs.getLong(2));
+    }
+    
+    private List<Long> createKey(ResultSet rs) throws SQLException {
+        List<Long> key = new LinkedList<Long>();
+        long host_value_id = rs.getLong(5);
+        if (!rs.wasNull())
+            key.add(getHostIdl());
+            key.add(host_value_id);
+        return key;
     }
     
     public void setMetric(byte[] metric) {

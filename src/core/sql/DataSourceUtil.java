@@ -72,4 +72,8 @@ public final class DataSourceUtil {
         return ByteBuffer.allocate(8).put(bytes).getLong(0);
     }
     
+    public static byte[] toBytes(long l) {
+        return ByteBuffer.allocate(8).putLong(l).array();
+    }
+    
 }

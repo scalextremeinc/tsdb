@@ -129,7 +129,7 @@ public final class SpanGroup implements DataPoints {
    * @param span The span to add to this group.  If none of the data points
    * fall within our time range, this method will silently ignore that span.
    */
-  void add(final Span span) {
+  public void add(final Span span) {
     if (tags != null) {
       throw new AssertionError("The set of tags has already been computed"
                                + ", you can't add more Spans to " + this);

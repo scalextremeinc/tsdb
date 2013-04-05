@@ -29,6 +29,10 @@ public class SpanViewSql implements SpanView {
         tags.put(name, value);
     }
     
+    public boolean hasTags() {
+        return !tags.isEmpty();
+    }
+    
     public String metricName() {
         return metricName;
     }
@@ -112,7 +116,7 @@ public class SpanViewSql implements SpanView {
 
         public void seek(long timestamp) {
             int len = points.size();
-            while (index < len && peekNextTimestamp() < timestamp) {
+            while (index < (len - 1) && peekNextTimestamp() < timestamp) {
                 index++;
             }
         }
