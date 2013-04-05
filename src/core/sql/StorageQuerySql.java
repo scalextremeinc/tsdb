@@ -31,6 +31,9 @@ import net.opentsdb.core.Aggregator;
 
 public class StorageQuerySql implements StorageQuery {
     
+    /** Used whenever there are no results. */
+    private static final DataPoints[] NO_RESULT = new DataPoints[0];
+    
     private static final Logger LOG = LoggerFactory.getLogger(StorageQuerySql.class);
     
     private final TsdbSql tsdb;
@@ -62,17 +65,67 @@ public class StorageQuerySql implements StorageQuery {
     }
     
     public DataPoints[] runQuery() throws StorageException {
-        List<Span> spans = queryDb();
-        List<SpanGroup> groups = new LinkedList<SpanGroup>();
-        for (Span s : spans) {
-            if (s.size() == 0)
-                continue;
-            SpanGroup group = new SpanGroup(tsdb, start_time, end_time,
-                null, rate, aggregator, sample_interval, downsampler);
-            group.add(s);
-            groups.add(group);
+        Map<List<Long>, Span> spans = queryDb();
+        
+        if (spans == null || spans.size() <= 0) {
+          return NO_RESULT;
         }
-        return groups.toArray(new SpanGroup[groups.size()]);
+        
+        if (group_bys == null) {
+          // We haven't been asked to find groups, so let's put all the spans
+          // together in the same group.
+          final SpanGroup group = new SpanGroup(tsdb, start_time, end_time,
+            spans.values(), rate, aggregator, sample_interval, downsampler);
+          return new SpanGroup[] { group };
+        }
+
+        final ByteMap<SpanGroup> groups = new ByteMap<SpanGroup>();
+        final short value_width = tsdb.getTagValues().width();
+        final byte[] group = new byte[group_bys.size() * value_width];
+        for (final Map.Entry<List<Long>, Span> entry : spans.entrySet()) {
+            List<Long> key = entry.getKey();
+            byte[] value_id = null;
+            int i = 0;
+            for (final byte[] tag_id : group_bys) {
+                Boolean is_plus_aggregate = plus_aggregate.get(tag_id);
+                if (is_plus_aggregate != null && is_plus_aggregate) {
+                    value_id = tag_id;
+                } else {
+                    value_id = getTagValue(key, tag_id);
+                }
+                if (value_id == null) {
+                  break;
+                }
+                System.arraycopy(value_id, 0, group, i, value_width);
+                i += value_width;
+            }
+            SpanGroup thegroup = groups.get(group);
+            if (thegroup == null) {
+                thegroup = new SpanGroup(tsdb, start_time, end_time,
+                    null, rate, aggregator, sample_interval, downsampler);
+                thegroup.setExtraTags(extra_tags);
+                // Copy the array because we're going to keep `group' and overwrite
+                // its contents.  So we want the collection to have an immutable copy.
+                final byte[] group_copy = new byte[group.length];
+                System.arraycopy(group, 0, group_copy, 0, group.length);
+                groups.put(group_copy, thegroup);
+            }
+            thegroup.add(entry.getValue());
+        }
+        
+        return groups.values().toArray(new SpanGroup[groups.size()]);
+    }
+    
+    private byte[] getTagValue(List<Long> key, byte[] tag_id) {
+        Long tag_idl = DataSourceUtil.toLong(tag_id);
+        Iterator<Long> i = key.iterator();
+        while (i.hasNext()) {
+            Long name_id = i.next();
+            Long value_id = i.next();
+            if (tag_idl.equals(name_id))
+                return DataSourceUtil.toBytes(value_id);
+        }
+        return null;
     }
     
     private String buildQuery() {
@@ -239,11 +292,11 @@ public class StorageQuerySql implements StorageQuery {
         return host_name_idl;
     }
     
-    private List<Span> queryDb() {
+    private Map<List<Long>, Span> queryDb() {
         String query = buildQuery();
         LOG.info("QUERY: " + query);
         
-        List<Span> spans = new ArrayList<Span>();
+        Map<List<Long>, Span> spans = new HashMap<List<Long>, Span>();
         Map<List<Long>, SpanViewSql> span_views = new HashMap<List<Long>, SpanViewSql>();
         
         Connection conn = null;
@@ -270,7 +323,7 @@ public class StorageQuerySql implements StorageQuery {
     private long current_point_id;
     private List<Long> current_key;
     
-    private void updateSpan(List<Span> spans, Map<List<Long>, SpanViewSql> span_views, ResultSet rs)
+    private void updateSpan(Map<List<Long>, Span> spans, Map<List<Long>, SpanViewSql> span_views, ResultSet rs)
             throws SQLException {
         
         if (current_key == null) {
@@ -310,7 +363,7 @@ public class StorageQuerySql implements StorageQuery {
                 rows.add(span_view);
                 Span s = new Span();
                 s.setSpanViews(rows);
-                spans.add(s);
+                spans.put(current_key, s);
             }
             
             span_view.addPoint(current_point);
