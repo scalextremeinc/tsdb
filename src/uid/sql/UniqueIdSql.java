@@ -124,25 +124,35 @@ public final class UniqueIdSql implements UniqueIdInterface {
             // skip
         }
         if (id == null) {
-            Connection conn = null;
-            PreparedStatement st = null;
-            ResultSet rs = null;
-            try {
-                conn = ds.getConnection();
-                st = conn.prepareStatement(insert_id_query, Statement.RETURN_GENERATED_KEYS);
-                st.setString(1, name);
-                st.executeUpdate();
-                
-                rs = st.getGeneratedKeys();
-                rs.next();
-                id = ByteBuffer.allocate(8).putLong(rs.getLong(1)).array();
-                
-                addIdToCache(name, id);
-                addNameToCache(id, name);                
-            } catch (SQLException e) {
-                LOG.error("Unable to insert name: " + e.getMessage());
-            } finally {
-                DataSourceUtil.close(rs, st, conn); 
+            synchronized(this) {
+                // TODO lock on db to allow multiple instances of tsdb to be run
+                try {
+                    id = getId(name);
+                } catch (NoSuchUniqueName e) {
+                    // skip
+                }
+                if (id != null)
+                    return id;
+                Connection conn = null;
+                PreparedStatement st = null;
+                ResultSet rs = null;
+                try {
+                    conn = ds.getConnection();
+                    st = conn.prepareStatement(insert_id_query, Statement.RETURN_GENERATED_KEYS);
+                    st.setString(1, name);
+                    st.executeUpdate();
+                    
+                    rs = st.getGeneratedKeys();
+                    rs.next();
+                    id = ByteBuffer.allocate(8).putLong(rs.getLong(1)).array();
+                    
+                    addIdToCache(name, id);
+                    addNameToCache(id, name);                
+                } catch (SQLException e) {
+                    LOG.error("Unable to insert name: " + e.getMessage());
+                } finally {
+                    DataSourceUtil.close(rs, st, conn); 
+                }
             }
         }
         return id;
