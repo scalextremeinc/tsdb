@@ -172,6 +172,8 @@ public class StorageQuerySql implements StorageQuery {
         if (tags_condition.length() > 0 || group_condition.length() > 0)
            query.append(")");
         
+        query.append(" ORDER BY t.ts,t.id");
+        
         return query.toString();
     }
     
