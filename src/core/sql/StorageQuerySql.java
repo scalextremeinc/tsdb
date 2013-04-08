@@ -131,11 +131,15 @@ public class StorageQuerySql implements StorageQuery {
     private String buildQuery() {
         StringBuilder host_condition = new StringBuilder();
         StringBuilder tags_condition = new StringBuilder();
+        StringBuilder group_condition = new StringBuilder();
         
+        join_tags = false;
         join_tags = buildHostCondition(host_condition);
         join_tags = buildTagsCondition(tags_condition) || join_tags;
+        if (group_bys != null)
+            buildGroupingCondition(group_condition);
         
-        boolean group = join_tags && group_bys != null && group_bys.size() > 0;
+        //boolean group = join_tags && group_bys != null && group_bys.size() > 0;
 
         StringBuilder query = new StringBuilder("SELECT t.id,t.val_int,t.val_dbl,t.ts,t.hostid");
         if (join_tags)
@@ -153,17 +157,19 @@ public class StorageQuerySql implements StorageQuery {
             query.append(" AND t.id=g.tsdbid");
         query.append(host_condition);
         
-        if (tags_condition.length() > 0 || group)
+        if (tags_condition.length() > 0 || group_condition.length() > 0) {
+            LOG.error("tags_condition.length(): " + tags_condition.length());
             query.append(" AND (");
+        }
             
         query.append(tags_condition);
-        if (group) {
+        if (group_condition.length() > 0) {
             if (tags_condition.length() > 0)
                 query.append(" OR");
-            buildGroupingCondition(query);
+            query.append(group_condition);
         }
            
-        if (tags_condition.length() > 0 || group)
+        if (tags_condition.length() > 0 || group_condition.length() > 0)
            query.append(")");
         
         return query.toString();
@@ -192,8 +198,8 @@ public class StorageQuerySql implements StorageQuery {
                 tags_condition.append(DataSourceUtil.toLong(name_id));
                 tags_condition.append(" AND g.tagvid=");
                 tags_condition.append(DataSourceUtil.toLong(value_id));
-                join_tags = true;
                 tags_condition.append(")");
+                join_tags = true;
             }
         }
         
