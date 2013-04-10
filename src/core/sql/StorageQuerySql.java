@@ -338,10 +338,10 @@ public class StorageQuerySql implements StorageQuery {
                     tsdb.getTagValues().getName(DataSourceUtil.toBytes(value_id)));
             }
             
-            String key_str = "";
-            for (Long l : key)
-                key_str += "_" + l;
-            LOG.info("new span view: " + span_view + ", key: " + key_str);
+            //String key_str = "";
+            //for (Long l : key)
+            //    key_str += "_" + l;
+            //LOG.info("new span view: " + span_view + ", key: " + key_str);
            
             span_views.put(key, span_view);
             List<SpanViewSql> rows = new ArrayList<SpanViewSql>();
