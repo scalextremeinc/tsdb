@@ -42,7 +42,8 @@ public class StorageQuerySql implements StorageQuery {
     private final String table_tsdbtag;
     private byte[] host_name_id;
     private Long host_name_idl;
-    private List<String> tags_columns = new LinkedList<String>();
+    private String[] tags_columns = {"hostid", "t0_valueid", "t1_valueid",
+        "t2_valueid", "t3_valueid", "t4_valueid", "t5_valueid", "t6_valueid"};
     
     private byte[] metric;
     private long start_time;
@@ -133,9 +134,9 @@ public class StorageQuerySql implements StorageQuery {
         StringBuilder tags_condition = new StringBuilder();
         StringBuilder group_condition = new StringBuilder();
         
-        buildHostCondition(host_condition, tags_columns);
-        buildTagsCondition(tags_condition, tags_columns);
-        buildGroupingCondition(group_condition, tags_columns);
+        buildHostCondition(host_condition);
+        buildTagsCondition(tags_condition);
+        buildGroupingCondition(group_condition);
 
         StringBuilder query = new StringBuilder("SELECT val_int,val_dbl,ts");
         for (String col : tags_columns) {
@@ -172,7 +173,7 @@ public class StorageQuerySql implements StorageQuery {
         return query.toString();
     }
     
-    private void buildHostCondition(StringBuilder host_condition, List<String> tags_columns) {
+    private void buildHostCondition(StringBuilder host_condition) {
         byte[] host_id = getHostId();
 
         int name_width = tsdb.getTagNames().width();
@@ -185,7 +186,6 @@ public class StorageQuerySql implements StorageQuery {
                 System.arraycopy(tag, name_width, value_id, 0, value_width);
                 host_condition.append(" AND hostid=");
                 host_condition.append(DataSourceUtil.toLong(value_id));
-                tags_columns.add("hostid");
                 break;
             }
         }
@@ -208,14 +208,13 @@ public class StorageQuerySql implements StorageQuery {
                         host_condition.append(")");
                         
                     }
-                    tags_columns.add("hostid");
                     break;
                 }
             }
         }
     }
     
-    private void buildTagsCondition(StringBuilder tags_condition, List<String> tags_columns) {
+    private void buildTagsCondition(StringBuilder tags_condition) {
         byte[] host_id = getHostId();
 
         int name_width = tsdb.getTagNames().width();
@@ -233,7 +232,7 @@ public class StorageQuerySql implements StorageQuery {
                     tags_condition.append(" OR (");
                 }
                 
-                String tag_name = tsdb.getTagNames().getName(tag);
+                String tag_name = tsdb.getTagNames().getName(name_id);
                 String column_name = tag_name + "_valueid";
                 
                 System.arraycopy(tag, name_width, value_id, 0, value_width);
@@ -241,14 +240,12 @@ public class StorageQuerySql implements StorageQuery {
                 tags_condition.append(column_name);
                 tags_condition.append('=');
                 tags_condition.append(DataSourceUtil.toLong(value_id));
-                tags_condition.append(")");
-                
-                tags_columns.add(column_name);
+                tags_condition.append(")");                
             }
         }
     }
     
-    private void buildGroupingCondition(StringBuilder group_condition, List<String> tags_columns) {
+    private void buildGroupingCondition(StringBuilder group_condition) {
         if (group_bys == null)
             return;
         // AND ( g.tagkid=? AND g.tagvid IN (17,18,19,20) OR ... )
@@ -279,8 +276,6 @@ public class StorageQuerySql implements StorageQuery {
                 group_condition.append(")");
                 group_condition.append(")");
             }
-
-            tags_columns.add(column_name);
         }
     }
     
@@ -343,10 +338,10 @@ public class StorageQuerySql implements StorageQuery {
                     tsdb.getTagValues().getName(DataSourceUtil.toBytes(value_id)));
             }
             
-            //String current_key_str = "";
-            //for (Long l : current_key)
-            //    current_key_str += "_" + l;
-            //LOG.info("new span view: " + span_view + ", key: " + current_key_str);
+            String key_str = "";
+            for (Long l : key)
+                key_str += "_" + l;
+            LOG.info("new span view: " + span_view + ", key: " + key_str);
            
             span_views.put(key, span_view);
             List<SpanViewSql> rows = new ArrayList<SpanViewSql>();

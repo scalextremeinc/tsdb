@@ -1,7 +1,7 @@
 
 CREATE TABLE `metric` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL,
+  `name` varchar(1024) NOT NULL,
   PRIMARY KEY (id)
 ) ENGINE=TokuDB DEFAULT CHARSET=utf8;
 
@@ -13,7 +13,7 @@ CREATE TABLE `tagk` (
 
 CREATE TABLE `tagv` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL,
+  `name` varchar(1024) NOT NULL,
   PRIMARY KEY (id)
 ) ENGINE=TokuDB DEFAULT CHARSET=utf8;
 
@@ -29,6 +29,5 @@ CREATE TABLE `tsdb` (
   `t3_valueid` bigint unsigned,
   `t4_valueid` bigint unsigned,
   `t5_valueid` bigint unsigned,
-  `t6_valueid` bigint unsigned,
-   PRIMARY KEY (id)
+  `t6_valueid` bigint unsigned
 ) ENGINE=TokuDB DEFAULT CHARSET=utf8;
