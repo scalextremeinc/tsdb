@@ -2,6 +2,7 @@ package net.opentsdb.core.sql;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import java.nio.ByteBuffer;
 
@@ -26,6 +27,7 @@ import net.opentsdb.core.TSDB;
 import net.opentsdb.core.Query;
 import net.opentsdb.core.TsdbQuery;
 import net.opentsdb.core.WritableDataPoints;
+import net.opentsdb.core.IncomingDataPoints;
 
 import net.opentsdb.uid.sql.UniqueIdSql;
 
@@ -40,11 +42,6 @@ public final class TsdbSql implements TSDB {
     private final UniqueIdSql tag_values;
     
     private final String table_tsdb;
-    private final String table_tsdbtag;
-    
-    private final String insert_int_query;
-    private final String insert_double_query;
-    private final String insert_tag_query;
     
     public TsdbSql(DataSource ds, String table_prefix) {
         this.ds = ds;
@@ -52,10 +49,6 @@ public final class TsdbSql implements TSDB {
         tag_names = new UniqueIdSql(ds, addPrefix(table_prefix, "tagk"));
         tag_values = new UniqueIdSql(ds, addPrefix(table_prefix, "tagv"));
         table_tsdb = addPrefix(table_prefix, "tsdb");
-        table_tsdbtag = addPrefix(table_prefix, "tsdbtag");
-        insert_int_query = "INSERT INTO " + table_tsdb + " (val_int, ts, metricid, hostid) VALUES (?, ?, ?, ?)";
-        insert_double_query = "INSERT INTO " + table_tsdb + " (val_dbl, ts, metricid, hostid) VALUES (?, ?, ?, ?)";
-        insert_tag_query = "INSERT INTO " + table_tsdbtag + " VALUES (?, ?, ?)";
     }
     
     private String addPrefix(String prefix, String name) {
@@ -76,8 +69,9 @@ public final class TsdbSql implements TSDB {
         return new Deferred<Object>();
     }
     
-    private void addPoint(String metric, long timestamp, Map<String, String> tags,
+    private String buildInsertQuery(String metric, long timestamp, Map<String, String> tags,
             Float val_dbl, Long val_int) {
+        
         byte[] metric_id = metrics.getOrCreateId(metric);
         String host = tags.get("host");
         byte[] host_id = null;
@@ -87,59 +81,82 @@ public final class TsdbSql implements TSDB {
             tag_names.getOrCreateId("host");
         }
         
-        String insert_query = insert_double_query;
-        if (val_int != null) {
-            insert_query = insert_int_query;
+        StringBuilder query = new StringBuilder();
+        query.append("INSERT INTO ");
+        query.append(table_tsdb);
+        if (val_dbl != null)
+            query.append("(val_dbl,");
+        else
+            query.append("(val_int,");
+        query.append("ts,metricid");
+        if (host_id != null)
+            query.append(",hostid");
+        Set<String> tag_keys = tags.keySet();
+        for (String tag : tag_keys) {
+            if ("host".equals(tag))
+                continue;
+            query.append(',');
+            query.append(tag);
+            query.append("_valueid");
+            // make sure tag name id is created - used by query
+            tag_names.getOrCreateId(tag);
         }
+        query.append(") VALUES (");
+        if (val_dbl != null)
+            query.append(val_dbl);
+        else
+            query.append(val_int);
+        query.append(',');
+        query.append(timestamp);
+        query.append(',');
+        query.append(DataSourceUtil.toLong(metric_id));
+        if (host_id != null) {
+            query.append(',');
+            query.append(DataSourceUtil.toLong(host_id));
+        }
+        // append tags
+        for (String tag : tag_keys) {
+            if ("host".equals(tag))
+                continue;
+            String value = tags.get(tag);
+            byte[] value_id = tag_values.getOrCreateId(value);
+            query.append(',');
+            query.append(DataSourceUtil.toLong(value_id));
+        }
+        query.append(')');
+        
+        return query.toString();
+    }
+    
+    private void addPoint(String metric, long timestamp, Map<String, String> tags,
+            Float val_dbl, Long val_int) {
+
+        /*if ((timestamp & 0xFFFFFFFF00000000L) != 0) {
+          // => timestamp < 0 || timestamp > Integer.MAX_VALUE
+          throw new IllegalArgumentException((timestamp < 0 ? "negative " : "bad")
+              + " timestamp=" + timestamp
+              + " when trying to add value=" + Arrays.toString(value) + '/' + flags
+              + " to metric=" + metric + ", tags=" + tags);
+        }
+        */
+        //IncomingDataPoints.checkMetricAndTags(metric, tags);
+        
+        String insert_query = buildInsertQuery(metric, timestamp, tags, val_dbl, val_int);
+        //LOG.info(insert_query);
         
         Connection conn = null;
         PreparedStatement st = null;
         ResultSet rs = null;
         try {
             conn = ds.getConnection();
-            conn.setAutoCommit(false);
-            long id;
             try {
-                st = conn.prepareStatement(insert_query, Statement.RETURN_GENERATED_KEYS);
-                if (val_dbl != null)
-                    st.setDouble(1, val_dbl);
-                else
-                    st.setLong(1, val_int);
-                st.setLong(2, timestamp);
-                st.setLong(3, DataSourceUtil.toLong(metric_id));
-                if (host_id != null) {
-                    st.setLong(4, DataSourceUtil.toLong(host_id));
-                } else
-                    st.setNull(4, Types.INTEGER);
+                st = conn.prepareStatement(insert_query);
                 st.executeUpdate();
-                
-                rs = st.getGeneratedKeys();
-                rs.next();
-                id = rs.getLong(1);
             } finally {
                 DataSourceUtil.close(rs, st, null);
             }
-            byte[] tagk = null;
-            byte[] tagv = null;
-            for (Map.Entry<String, String> entry : tags.entrySet()) {
-                if ("host".equals(entry.getKey())) {
-                    continue;
-                }
-                tagk = tag_names.getOrCreateId(entry.getKey());
-                tagv = tag_values.getOrCreateId(entry.getValue());
-                if (tagk != null && tagv != null)
-                    try {
-                        st = conn.prepareStatement(insert_tag_query);
-                        st.setLong(1, id);
-                        st.setLong(2, DataSourceUtil.toLong(tagk));
-                        st.setLong(3, DataSourceUtil.toLong(tagv));
-                        st.executeUpdate();
-                    } finally {
-                        st.close();
-                    }
-            }
-            conn.commit();
         } catch (SQLException e) {
+            LOG.info(insert_query);
             LOG.error("Unable to get sql db connection: " + e.getMessage());
         } finally {
             DataSourceUtil.close(rs, st, conn);
@@ -184,7 +201,7 @@ public final class TsdbSql implements TSDB {
 
     public Query newQuery() {
         TsdbQuery query = new TsdbQuery(this);
-        query.setStorageQuery(new StorageQuerySql(this, ds, table_tsdb, table_tsdbtag));
+        query.setStorageQuery(new StorageQuerySql(this, ds, table_tsdb, null));
         return query;
     }
 

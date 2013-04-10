@@ -42,7 +42,7 @@ public class StorageQuerySql implements StorageQuery {
     private final String table_tsdbtag;
     private byte[] host_name_id;
     private Long host_name_idl;
-    private boolean join_tags = false;
+    private List<String> tags_columns = new LinkedList<String>();
     
     private byte[] metric;
     private long start_time;
@@ -133,28 +133,23 @@ public class StorageQuerySql implements StorageQuery {
         StringBuilder tags_condition = new StringBuilder();
         StringBuilder group_condition = new StringBuilder();
         
-        join_tags = false;
-        join_tags = buildHostCondition(host_condition);
-        join_tags = buildTagsCondition(tags_condition) || join_tags;
-        if (group_bys != null)
-            buildGroupingCondition(group_condition);
-        
-        //boolean group = join_tags && group_bys != null && group_bys.size() > 0;
+        buildHostCondition(host_condition, tags_columns);
+        buildTagsCondition(tags_condition, tags_columns);
+        buildGroupingCondition(group_condition, tags_columns);
 
-        StringBuilder query = new StringBuilder("SELECT t.id,t.val_int,t.val_dbl,t.ts,t.hostid");
-        if (join_tags)
-            query.append(",g.tagkid,g.tagvid");
-        query.append(" FROM " + table_tsdb + " as t");
-        if (join_tags)
-            query.append(", " + table_tsdbtag + " as g");
-        query.append(" WHERE t.metricid=");
+        StringBuilder query = new StringBuilder("SELECT val_int,val_dbl,ts");
+        for (String col : tags_columns) {
+            query.append(',');
+            query.append(col);
+        }
+        query.append(" FROM ");
+        query.append(table_tsdb);
+        query.append(" WHERE metricid=");
         query.append(DataSourceUtil.toLong(metric));
-        query.append(" AND t.ts >= ");
+        query.append(" AND ts >= ");
         query.append(start_time);
-        query.append(" AND t.ts <= ");
+        query.append(" AND ts <= ");
         query.append(end_time);
-        if (join_tags)
-            query.append(" AND t.id=g.tsdbid");
         query.append(host_condition);
         
         if (tags_condition.length() > 0 || group_condition.length() > 0) {
@@ -172,13 +167,55 @@ public class StorageQuerySql implements StorageQuery {
         if (tags_condition.length() > 0 || group_condition.length() > 0)
            query.append(")");
         
-        query.append(" ORDER BY t.ts,t.id");
+        query.append(" ORDER BY ts");
         
         return query.toString();
     }
     
-    private boolean buildTagsCondition(StringBuilder tags_condition) {
-        boolean join_tags = false;
+    private void buildHostCondition(StringBuilder host_condition, List<String> tags_columns) {
+        byte[] host_id = getHostId();
+
+        int name_width = tsdb.getTagNames().width();
+        int value_width = tsdb.getTagValues().width();
+        byte[] name_id = new byte[name_width];
+        byte[] value_id = new byte[value_width];
+        for (byte[] tag : tags) {
+            System.arraycopy(tag, 0, name_id, 0, name_width);
+            if (Arrays.equals(name_id, host_id)) {
+                System.arraycopy(tag, name_width, value_id, 0, value_width);
+                host_condition.append(" AND hostid=");
+                host_condition.append(DataSourceUtil.toLong(value_id));
+                tags_columns.add("hostid");
+                break;
+            }
+        }
+        
+        //LOG.info("group_bys size: " + group_bys.size());
+        if (host_condition.length() == 0 && group_bys != null && group_bys.size() > 0) {
+            byte[] group_by;
+            for (int i = 0; i < group_bys.size(); i++) {
+                group_by = group_bys.get(i);
+                if (Arrays.equals(group_by, host_id)) {
+                    byte[][] value_ids = (group_by_values == null 
+                        ? null : group_by_values.get(group_by));
+                    if (value_ids != null && value_ids.length > 0) {
+                        host_condition.append(" AND hostid IN (");
+                        for (int j = 0; j <  value_ids.length; j++) {
+                            host_condition.append(DataSourceUtil.toLong(value_ids[j]));
+                            if (j < value_ids.length - 1)
+                                host_condition.append(',');
+                        }
+                        host_condition.append(")");
+                        
+                    }
+                    tags_columns.add("hostid");
+                    break;
+                }
+            }
+        }
+    }
+    
+    private void buildTagsCondition(StringBuilder tags_condition, List<String> tags_columns) {
         byte[] host_id = getHostId();
 
         int name_width = tsdb.getTagNames().width();
@@ -195,20 +232,25 @@ public class StorageQuerySql implements StorageQuery {
                 } else {
                     tags_condition.append(" OR (");
                 }
+                
+                String tag_name = tsdb.getTagNames().getName(tag);
+                String column_name = tag_name + "_valueid";
+                
                 System.arraycopy(tag, name_width, value_id, 0, value_width);
-                tags_condition.append(" g.tagkid=");
-                tags_condition.append(DataSourceUtil.toLong(name_id));
-                tags_condition.append(" AND g.tagvid=");
+                tags_condition.append(' ');
+                tags_condition.append(column_name);
+                tags_condition.append('=');
                 tags_condition.append(DataSourceUtil.toLong(value_id));
                 tags_condition.append(")");
-                join_tags = true;
+                
+                tags_columns.add(column_name);
             }
         }
-        
-        return join_tags;
     }
     
-    private void buildGroupingCondition(StringBuilder query) {
+    private void buildGroupingCondition(StringBuilder group_condition, List<String> tags_columns) {
+        if (group_bys == null)
+            return;
         // AND ( g.tagkid=? AND g.tagvid IN (17,18,19,20) OR ... )
         byte[] host_id = getHostId();
         byte[] group_by;
@@ -216,74 +258,30 @@ public class StorageQuerySql implements StorageQuery {
             group_by = group_bys.get(i);
             if (Arrays.equals(group_by, host_id))
                 continue;
-            if (i > 0)
-                query.append(" OR (");
-            else
-                query.append(" (");
-            query.append(" g.tagkid=");
-            query.append(DataSourceUtil.toLong(group_by));
-            byte[][] value_ids = (group_by_values == null 
-                ? null : group_by_values.get(group_by));
+                            
+            String tag_name = tsdb.getTagNames().getName(group_by);
+            String column_name = tag_name + "_valueid";
+            
+            byte[][] value_ids = (group_by_values == null ? null : group_by_values.get(group_by));
             if (value_ids != null && value_ids.length > 0) {
-                query.append(" AND g.tagvid IN (");
+                if (i > 0)
+                    group_condition.append(" OR (");
+                else
+                    group_condition.append(" (");
+                group_condition.append(' ');
+                group_condition.append(column_name);
+                group_condition.append(" IN (");
                 for (int j = 0; j <  value_ids.length; j++) {
-                    query.append(DataSourceUtil.toLong(value_ids[j]));
+                    group_condition.append(DataSourceUtil.toLong(value_ids[j]));
                     if (j < value_ids.length - 1)
-                        query.append(',');
+                        group_condition.append(',');
                 }
-                query.append(")");
+                group_condition.append(")");
+                group_condition.append(")");
             }
-            query.append(")");
-        }
-    }
-    
-    private boolean buildHostCondition(StringBuilder host_condition) {
-        boolean join_tags = false;
-        byte[] host_id = getHostId();
 
-        int name_width = tsdb.getTagNames().width();
-        int value_width = tsdb.getTagValues().width();
-        byte[] name_id = new byte[name_width];
-        byte[] value_id = new byte[value_width];
-        for (byte[] tag : tags) {
-            System.arraycopy(tag, 0, name_id, 0, name_width);
-            if (Arrays.equals(name_id, host_id)) {
-                System.arraycopy(tag, name_width, value_id, 0, value_width);
-                host_condition.append(" AND t.hostid=");
-                host_condition.append(DataSourceUtil.toLong(value_id));
-                break;
-            }
+            tags_columns.add(column_name);
         }
-        
-        //LOG.info("group_bys size: " + group_bys.size());
-        if (host_condition.length() == 0 && group_bys != null && group_bys.size() > 0) {
-            byte[] group_by;
-            for (int i = 0; i < group_bys.size(); i++) {
-                group_by = group_bys.get(i);
-                if (Arrays.equals(group_by, host_id)) {
-                    byte[][] value_ids = (group_by_values == null 
-                        ? null : group_by_values.get(group_by));
-                    if (value_ids != null && value_ids.length > 0) {
-                        host_condition.append(" AND t.hostid IN (");
-                        for (int j = 0; j <  value_ids.length; j++) {
-                            host_condition.append(DataSourceUtil.toLong(value_ids[j]));
-                            if (j < value_ids.length - 1)
-                                host_condition.append(',');
-                        }
-                        host_condition.append(")");
-                    }
-                    break;
-                }
-            }
-            if (host_condition.length() > 0 && group_bys.size() > 1 
-                    || host_condition.length() == 0 && group_bys.size() > 0) {
-                join_tags = true;
-            }
-        } else if (group_bys != null && group_bys.size() > 0) {
-            join_tags = true;
-        }
-        
-        return join_tags;
     }
     
     private byte[] getHostId() {
@@ -302,7 +300,7 @@ public class StorageQuerySql implements StorageQuery {
     
     private Map<List<Long>, Span> queryDb() {
         String query = buildQuery();
-        LOG.info("QUERY: " + query);
+        LOG.info(query);
         
         Map<List<Long>, Span> spans = new HashMap<List<Long>, Span>();
         Map<List<Long>, SpanViewSql> span_views = new HashMap<List<Long>, SpanViewSql>();
@@ -313,7 +311,6 @@ public class StorageQuerySql implements StorageQuery {
         try {
             conn = ds.getConnection();
             st = conn.prepareStatement(query);
-            //st.setLong(1, DataSourceUtil.toLong(metric));
             rs = st.executeQuery();
             while (rs.next()) {
                 updateSpan(spans, span_views, rs);
@@ -327,79 +324,70 @@ public class StorageQuerySql implements StorageQuery {
         return spans;
     }
     
-    private DataPoint current_point;
-    private long current_point_id;
-    private List<Long> current_key;
-    
     private void updateSpan(Map<List<Long>, Span> spans, Map<List<Long>, SpanViewSql> span_views, ResultSet rs)
             throws SQLException {
         
-        if (current_key == null) {
-            current_key = createKey(rs);
-        }
+        List<Long> key = createKey(rs);
+        DataPoint point = createPoint(rs);
         
-        long point_id = rs.getLong(1);
-        
-        if (current_point == null) {
-            current_point = createPoint(rs);
-            current_point_id = point_id;
-        }
-        
-        if (current_point_id == point_id && join_tags) {
-            current_key.add(rs.getLong(6));
-            current_key.add(rs.getLong(7));
-        } else if (current_point_id != point_id) {
-            SpanViewSql span_view = span_views.get(current_key);
-            if (span_view == null) {
-                span_view = new SpanViewSql(tsdb.getMetrics().getName(metric));
-                // set tags
-                Iterator<Long> i = current_key.iterator();
-                while (i.hasNext()) {
-                    Long name_id = i.next();
-                    Long value_id = i.next();
-                    span_view.putTag(tsdb.getTagNames().getName(DataSourceUtil.toBytes(name_id)),
-                        tsdb.getTagValues().getName(DataSourceUtil.toBytes(value_id)));
-                }
-                
-                //String current_key_str = "";
-                //for (Long l : current_key)
-                //    current_key_str += "_" + l;
-                //LOG.info("new span view: " + span_view + ", key: " + current_key_str);
-               
-                span_views.put(current_key, span_view);
-                List<SpanViewSql> rows = new ArrayList<SpanViewSql>();
-                rows.add(span_view);
-                Span s = new Span();
-                s.setSpanViews(rows);
-                spans.put(current_key, s);
+
+        SpanViewSql span_view = span_views.get(key);
+        if (span_view == null) {
+            span_view = new SpanViewSql(tsdb.getMetrics().getName(metric));
+            // set tags
+            Iterator<Long> i = key.iterator();
+            while (i.hasNext()) {
+                Long name_id = i.next();
+                Long value_id = i.next();
+                span_view.putTag(tsdb.getTagNames().getName(DataSourceUtil.toBytes(name_id)),
+                    tsdb.getTagValues().getName(DataSourceUtil.toBytes(value_id)));
             }
             
-            span_view.addPoint(current_point);
-            
-            current_key = createKey(rs);
-            current_point = createPoint(rs);
-            current_point_id = point_id;
-            if (join_tags) {
-                current_key.add(rs.getLong(6));
-                current_key.add(rs.getLong(7));
-            }
+            //String current_key_str = "";
+            //for (Long l : current_key)
+            //    current_key_str += "_" + l;
+            //LOG.info("new span view: " + span_view + ", key: " + current_key_str);
+           
+            span_views.put(key, span_view);
+            List<SpanViewSql> rows = new ArrayList<SpanViewSql>();
+            rows.add(span_view);
+            Span s = new Span();
+            s.setSpanViews(rows);
+            spans.put(key, s);
         }
+            
+        span_view.addPoint(point);
     }
     
     private DataPointImpl createPoint(ResultSet rs) throws SQLException {
-        double val_dbl = rs.getDouble(3);
+        double val_dbl = rs.getDouble(2);
         if (!rs.wasNull())
-            return new DataPointImpl(rs.getLong(4), val_dbl);
+            return new DataPointImpl(rs.getLong(3), val_dbl);
         else
-            return new DataPointImpl(rs.getLong(4), rs.getLong(2));
+            return new DataPointImpl(rs.getLong(3), rs.getLong(1));
     }
     
     private List<Long> createKey(ResultSet rs) throws SQLException {
         List<Long> key = new LinkedList<Long>();
-        long host_value_id = rs.getLong(5);
-        if (!rs.wasNull())
-            key.add(getHostIdl());
-            key.add(host_value_id);
+         
+        for (String tagcol : tags_columns) {
+            if ("hostid".equals(tagcol)) {
+                long host_value_id = rs.getLong(4);
+                if (!rs.wasNull()) {
+                    key.add(getHostIdl());
+                    key.add(host_value_id);
+                }
+            } else {
+                long value_id = rs.getLong(tagcol);
+                if (!rs.wasNull()) {
+                    String tag = tagcol.substring(0, 2);
+                    long tag_id = DataSourceUtil.toLong(tsdb.getTagNames().getId(tag));
+                    key.add(tag_id);
+                    key.add(value_id);
+                }
+            }
+        }
+        
         return key;
     }
     

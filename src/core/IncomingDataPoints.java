@@ -28,7 +28,7 @@ import net.opentsdb.stats.Histogram;
 /**
  * Receives new data points and stores them in HBase.
  */
-final class IncomingDataPoints implements WritableDataPoints {
+public final class IncomingDataPoints implements WritableDataPoints {
 
   /** For auto create metrics mode, set by --auto-metric flag in TSDMain.  */
   private static final boolean AUTO_METRIC =

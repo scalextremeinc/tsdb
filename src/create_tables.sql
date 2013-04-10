@@ -18,17 +18,17 @@ CREATE TABLE `tagv` (
 ) ENGINE=TokuDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE `tsdb` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `val_int` bigint(20) unsigned,
   `val_dbl` double(20,4),
   `ts` bigint NOT NULL,
   `metricid` bigint unsigned NOT NULL,
   `hostid` bigint unsigned,
+  `t0_valueid` bigint unsigned,
+  `t1_valueid` bigint unsigned,
+  `t2_valueid` bigint unsigned,
+  `t3_valueid` bigint unsigned,
+  `t4_valueid` bigint unsigned,
+  `t5_valueid` bigint unsigned,
+  `t6_valueid` bigint unsigned,
    PRIMARY KEY (id)
-) ENGINE=TokuDB DEFAULT CHARSET=utf8;
-
-CREATE TABLE `tsdbtag` (
-  `tsdbid` bigint unsigned NOT NULL,
-  `tagkid` bigint unsigned NOT NULL,
-  `tagvid` bigint unsigned NOT NULL
 ) ENGINE=TokuDB DEFAULT CHARSET=utf8;
