@@ -139,7 +139,7 @@ public final class TsdbSql implements TSDB {
               + " to metric=" + metric + ", tags=" + tags);
         }
         */
-        //IncomingDataPoints.checkMetricAndTags(metric, tags);
+        IncomingDataPoints.checkMetricAndTags(metric, tags);
         
         String insert_query = buildInsertQuery(metric, timestamp, tags, val_dbl, val_int);
         //LOG.info(insert_query);

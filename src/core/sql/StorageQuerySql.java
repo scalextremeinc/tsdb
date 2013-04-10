@@ -154,7 +154,6 @@ public class StorageQuerySql implements StorageQuery {
         query.append(host_condition);
         
         if (tags_condition.length() > 0 || group_condition.length() > 0) {
-            LOG.error("tags_condition.length(): " + tags_condition.length());
             query.append(" AND (");
         }
             

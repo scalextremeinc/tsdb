@@ -32,4 +32,5 @@ CREATE TABLE `tsdb` (
   `t6_valueid` bigint unsigned
 ) ENGINE=TokuDB DEFAULT CHARSET=utf8;
 
-CREATE INDEX index1 ON tsdb (ts,metricid,hostid);
+CREATE INDEX index1 ON tsdb (metricid,hostid);
+CREATE INDEX index2 ON tsdb (hostid,metricid);

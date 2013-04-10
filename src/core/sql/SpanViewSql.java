@@ -103,7 +103,7 @@ public class SpanViewSql implements SpanView {
         /* SeekableView */
         
         public boolean hasNext() {
-            return index < points.size();
+            return index < (points.size() - 1);
         }
 
         public DataPoint next() {
@@ -115,8 +115,7 @@ public class SpanViewSql implements SpanView {
         }
 
         public void seek(long timestamp) {
-            int len = points.size();
-            while (index < (len - 1) && peekNextTimestamp() < timestamp) {
+            while (index < (points.size() - 1) && peekNextTimestamp() < timestamp) {
                 index++;
             }
         }

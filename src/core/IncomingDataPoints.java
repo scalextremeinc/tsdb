@@ -86,7 +86,7 @@ public final class IncomingDataPoints implements WritableDataPoints {
    * Validates the given metric and tags.
    * @throws IllegalArgumentException if any of the arguments aren't valid.
    */
-  static void checkMetricAndTags(final String metric, final Map<String, String> tags) {
+  public static void checkMetricAndTags(final String metric, final Map<String, String> tags) {
     if (tags.size() <= 0) {
       throw new IllegalArgumentException("Need at least one tags (metric="
           + metric + ", tags=" + tags + ')');
