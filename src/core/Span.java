@@ -133,7 +133,7 @@ final public class Span implements DataPoints {
         buf.append(", ");
       }
       buf.append(rows.get(i).toString());
-      buf.append("-");
+      buf.append(", ");
       buf.append(rows.get(i).size());
     }
     buf.append("])");

@@ -103,7 +103,7 @@ public class SpanViewSql implements SpanView {
         /* SeekableView */
         
         public boolean hasNext() {
-            return index < (points.size() - 1);
+            return index < points.size();
         }
 
         public DataPoint next() {

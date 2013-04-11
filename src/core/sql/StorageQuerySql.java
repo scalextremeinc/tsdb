@@ -331,10 +331,26 @@ public class StorageQuerySql implements StorageQuery {
             // set tags
             Iterator<Long> i = key.iterator();
             while (i.hasNext()) {
-                Long name_id = i.next();
+                byte[] name_id = DataSourceUtil.toBytes(i.next());
                 Long value_id = i.next();
-                span_view.putTag(tsdb.getTagNames().getName(DataSourceUtil.toBytes(name_id)),
-                    tsdb.getTagValues().getName(DataSourceUtil.toBytes(value_id)));
+                // add tag to span view only if it appears in tags or groupbys
+                boolean add = false;
+                if (group_bys != null)
+                    for (final byte[] tag_id : group_bys)
+                        if (Arrays.equals(tag_id, name_id))
+                            add = true;
+                if (!add) {
+                    int name_width = tsdb.getTagNames().width();
+                    byte[] tag_id = new byte[name_width];
+                    for (byte[] tag : tags) {
+                        System.arraycopy(tag, 0, tag_id, 0, name_width);
+                        if (Arrays.equals(tag_id, name_id))
+                            add = true;
+                    }
+                }
+                if (add)
+                    span_view.putTag(tsdb.getTagNames().getName(name_id),
+                        tsdb.getTagValues().getName(DataSourceUtil.toBytes(value_id)));
             }
             
             //String key_str = "";
