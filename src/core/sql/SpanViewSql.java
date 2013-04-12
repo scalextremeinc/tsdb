@@ -79,7 +79,8 @@ public class SpanViewSql implements SpanView {
     
     final class Iterator implements SpanViewIterator {
         
-        private int index = 0;
+        // initially iterators position is before first item
+        private int index = -1;
         
         /* SpanViewIterator */
         
@@ -103,11 +104,11 @@ public class SpanViewSql implements SpanView {
         /* SeekableView */
         
         public boolean hasNext() {
-            return index < points.size();
+            return index < (points.size() - 1);
         }
 
         public DataPoint next() {
-            return points.get(index++);
+            return points.get(++index);
         }
 
         public void remove() {
