@@ -40,6 +40,10 @@ public final class DataSourceUtil {
         cpds.setMinPoolSize(10);      
         cpds.setAcquireIncrement(10);
         cpds.setMaxPoolSize(300);
+        // test all idle, pooled but unchecked-out connections, every this number of seconds
+        cpds.setIdleConnectionTestPeriod(120);
+        // asynchronously verify connection at checkin
+        cpds.setTestConnectionOnCheckin(true);
         
         return cpds;
     }
