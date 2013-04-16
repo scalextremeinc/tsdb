@@ -754,6 +754,8 @@ public final class SpanGroup implements DataPoints {
                              ? Double.longBitsToDouble(values[prev])
                              : values[prev]);
           final long x1 = timestamps[prev] & TIME_MASK;
+          if (x0 == x1) // just to skip duplicated points (they can appear in sql)
+            return 0;
           assert x0 > x1: ("Next timestamp (" + x0 + ") is supposed to be "
             + " strictly greater than the previous one (" + x1 + "), but it's"
             + " not.  this=" + this);
