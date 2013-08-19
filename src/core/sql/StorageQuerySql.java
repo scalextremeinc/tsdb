@@ -160,7 +160,7 @@ public class StorageQuerySql implements StorageQuery {
         query.append(tags_condition);
         if (group_condition.length() > 0) {
             if (tags_condition.length() > 0)
-                query.append(" OR");
+                query.append(" AND");
             query.append(group_condition);
         }
            
@@ -228,7 +228,7 @@ public class StorageQuerySql implements StorageQuery {
                     tags_condition.append(" (");
                     empty = false;
                 } else {
-                    tags_condition.append(" OR (");
+                    tags_condition.append(" AND (");
                 }
                 
                 String tag_name = tsdb.getTagNames().getName(name_id);
@@ -261,7 +261,7 @@ public class StorageQuerySql implements StorageQuery {
             byte[][] value_ids = (group_by_values == null ? null : group_by_values.get(group_by));
             if (value_ids != null && value_ids.length > 0) {
                 if (i > 0)
-                    group_condition.append(" OR (");
+                    group_condition.append(" AND (");
                 else
                     group_condition.append(" (");
                 group_condition.append(' ');
