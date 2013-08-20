@@ -49,6 +49,7 @@ public class StorageQuerySql implements StorageQuery {
     private long start_time;
     private long end_time;
     private ArrayList<byte[]> tags;
+    private ArrayList<byte[]> empty_tags;
     private ArrayList<byte[]> group_bys;
     private ByteMap<byte[][]> group_by_values;
     private boolean rate;
@@ -242,6 +243,19 @@ public class StorageQuerySql implements StorageQuery {
                 tags_condition.append(")");                
             }
         }
+        
+        for (byte[] empty_tag : empty_tags) {
+            String tag_name = tsdb.getTagNames().getName(empty_tag);
+            String column_name = tag_name + "_valueid";
+            if (empty) {
+                tags_condition.append(" (");
+                empty = false;
+            } else {
+                tags_condition.append(" AND (");
+            }
+            tags_condition.append(column_name);
+            tags_condition.append(" is NULL)");
+        }
     }
     
     private void buildGroupingCondition(StringBuilder group_condition) {
@@ -415,6 +429,10 @@ public class StorageQuerySql implements StorageQuery {
           
     public void setTags(ArrayList<byte[]> tags) {
         this.tags = tags;
+    }
+    
+    public void setEmptyTags(ArrayList<byte[]> empty_tags) {
+        this.empty_tags = empty_tags;
     }
           
     public void setGroupBys(ArrayList<byte[]> group_bys) {

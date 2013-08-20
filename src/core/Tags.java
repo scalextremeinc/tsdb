@@ -334,6 +334,9 @@ public final class Tags {
     throws NoSuchUniqueName {
     final ArrayList<byte[]> tag_ids = new ArrayList<byte[]>(tags.size());
     for (final Map.Entry<String, String> entry : tags.entrySet()) {
+      // skip special query tag
+      if ("<empty>".equals(entry.getValue()))
+        continue;
       final byte[] tag_id = (create
                              ? tsdb.getTagNames().getOrCreateId(entry.getKey())
                              : tsdb.getTagNames().getId(entry.getKey()));

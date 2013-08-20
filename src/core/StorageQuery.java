@@ -12,6 +12,7 @@ public interface StorageQuery {
     void setScanStartTime(long start_time);
     void setScanEndTime(long end_time);
     void setTags(ArrayList<byte[]> tags);
+    void setEmptyTags(ArrayList<byte[]> empty_tags);
     void setGroupBys(ArrayList<byte[]> group_bys);
     void setGroupByValues(ByteMap<byte[][]> group_by_values);
     void setRate(boolean rate);

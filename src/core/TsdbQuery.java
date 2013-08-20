@@ -69,6 +69,11 @@ final public class TsdbQuery implements Query {
    * Invariant: an element cannot be both in this array and in group_bys.
    */
   private ArrayList<byte[]> tags;
+  
+  /**
+   * Tags specified in query as tag=<empty>, this allows to query for data without particular tag.
+   */
+  private ArrayList<byte[]> empty_tags = new ArrayList<byte[]>();
 
   /**
    * Tags by which we must group the results.
@@ -198,6 +203,12 @@ final public class TsdbQuery implements Query {
     while (i.hasNext()) {
       final Map.Entry<String, String> tag = i.next();
       final String tagvalue = tag.getValue();
+      if ("<empty>".equals(tagvalue)) {
+        LOG.info("Empty tag: " + tag.getKey());
+        byte[] tag_id = tsdb.getTagNames().getId(tag.getKey());
+        empty_tags.add(tag_id);
+        continue;
+      }
       if (tagvalue.equals("*")  // 'GROUP BY' with any value.
           || tagvalue.indexOf('|', 1) >= 0 || tagvalue.indexOf(' ', 1) >= 0) {  // Multiple possible values.
         if (group_bys == null) {
@@ -249,6 +260,7 @@ final public class TsdbQuery implements Query {
     storage_query.setScanStartTime(start_time);
     storage_query.setScanEndTime(end_time);
     storage_query.setTags(tags);
+    storage_query.setEmptyTags(empty_tags);
     storage_query.setGroupBys(group_bys);
     storage_query.setGroupByValues(group_by_values);
     storage_query.setRate(rate);
