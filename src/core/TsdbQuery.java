@@ -82,6 +82,11 @@ final class TsdbQuery implements Query {
    * Invariant: an element cannot be both in this array and in group_bys.
    */
   private ArrayList<byte[]> tags;
+  
+  /**
+   * Tags specified in query as tag=<empty>, this allows to query for data without particular tag.
+   */
+  private ArrayList<byte[]> empty_tags = new ArrayList<byte[]>();
 
   /**
    * Tags by which we must group the results.
@@ -201,6 +206,12 @@ final class TsdbQuery implements Query {
     while (i.hasNext()) {
       final Map.Entry<String, String> tag = i.next();
       final String tagvalue = tag.getValue();
+      if ("<empty>".equals(tagvalue)) {
+        LOG.info("Empty tag: " + tag.getKey());
+        byte[] tag_id = tsdb.tag_names.getId(tag.getKey());
+        empty_tags.add(tag_id);
+        continue;
+      }
       if (tagvalue.equals("*")  // 'GROUP BY' with any value.
           || tagvalue.indexOf('|', 1) >= 0 || tagvalue.indexOf(' ', 1) >= 0) {  // Multiple possible values.
         if (group_bys == null) {
@@ -274,13 +285,17 @@ final class TsdbQuery implements Query {
       ArrayList<ArrayList<KeyValue>> rows;
       while ((rows = scanner.nextRows().joinUninterruptibly()) != null) {
         hbase_time += (System.nanoTime() - starttime) / 1000000;
-        for (final ArrayList<KeyValue> row : rows) {
+        rowsLoop: for (final ArrayList<KeyValue> row : rows) {
           final byte[] key = row.get(0).key();
           if (Bytes.memcmp(metric, key, 0, metric_width) != 0) {
             throw new IllegalDataException("HBase returned a row that doesn't match"
                 + " our scanner (" + scanner + ")! " + row + " does not start"
                 + " with " + Arrays.toString(metric));
           }
+          // skip rows containg tags which are asked to be excluded
+          for (byte[] empty_tag : empty_tags)
+            if (Tags.hasTag(tsdb, key, empty_tag))
+              continue rowsLoop;
           Span datapoints = spans.get(key);
           if (datapoints == null) {
             datapoints = new Span(tsdb);

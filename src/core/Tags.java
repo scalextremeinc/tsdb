@@ -272,6 +272,29 @@ public final class Tags {
     }
     return result;
   }
+  
+  static boolean hasTag(final TSDB tsdb, final byte[] row, final byte[] tag) {
+    final short name_width = tsdb.tag_names.width();
+    final short value_width = tsdb.tag_values.width();
+    final short tag_bytes = (short) (name_width + value_width);
+    final short metric_ts_bytes = (short) (tsdb.metrics.width() + Const.TIMESTAMP_BYTES);
+
+    for (short pos = metric_ts_bytes; pos < row.length; pos += tag_bytes) {
+      boolean found = true;
+      for (short i = 0; i < name_width; i++) {
+        if (tag[i] != row[pos + i]) {
+          found = false;
+          break;
+        }
+      }
+      if (found) {
+        LOG.info("hasTag true");
+        return true;
+      }
+    }
+    LOG.info("hasTag false");
+    return false;  
+  }
 
   /**
    * Ensures that a given string is a valid metric name or tag name/value.
@@ -334,6 +357,9 @@ public final class Tags {
     throws NoSuchUniqueName {
     final ArrayList<byte[]> tag_ids = new ArrayList<byte[]>(tags.size());
     for (final Map.Entry<String, String> entry : tags.entrySet()) {
+      // skip special query tag
+      if ("<empty>".equals(entry.getValue()))
+        continue;
       final byte[] tag_id = (create
                              ? tsdb.tag_names.getOrCreateId(entry.getKey())
                              : tsdb.tag_names.getId(entry.getKey()));
