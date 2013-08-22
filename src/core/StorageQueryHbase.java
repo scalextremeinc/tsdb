@@ -72,6 +72,8 @@ public class StorageQueryHbase implements StorageQuery {
       this.tags = tags;
   }
   
+  public void setEmptyTags(ArrayList<byte[]> empty_tags) {}
+  
   public void setGroupBys(ArrayList<byte[]> group_bys) {
       this.group_bys = group_bys;
   }
