@@ -51,7 +51,6 @@ import net.opentsdb.stats.Histogram;
 import net.opentsdb.stats.StatsCollector;
 import net.opentsdb.uid.NoSuchUniqueName;
 import net.opentsdb.tsd.TaskExecutor;
-import net.opentsdb.core.GapFixDataPoints;
 
 /**
  * Stateless handler of HTTP graph requests (the {@code /q} endpoint).
