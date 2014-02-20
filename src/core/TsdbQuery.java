@@ -74,6 +74,7 @@ final class TsdbQuery implements Query {
 
   /** ID of the metric being looked up. */
   private byte[] metric;
+  private String metricName;
 
   /**
    * Tags of the metrics being looked up.
@@ -123,9 +124,17 @@ final class TsdbQuery implements Query {
   
   private Map<byte[], Boolean> aggregate_tag = new HashMap<byte[], Boolean>();
 
+  private boolean noprint;
+
   /** Constructor. */
   public TsdbQuery(final TSDB tsdb) {
     this.tsdb = tsdb;
+    this.noprint = false;
+  }
+
+  public TsdbQuery(final TSDB tsdb, boolean noprint) {
+    this.tsdb = tsdb;
+    this.noprint = noprint;
   }
 
   public void setStartTime(final long timestamp) {
@@ -170,6 +179,7 @@ final class TsdbQuery implements Query {
                             final boolean rate) throws NoSuchUniqueName {
     findGroupBys(tags);
     this.metric = tsdb.metrics.getId(metric);
+    this.metricName = metric;
     this.tags = Tags.resolveAll(tsdb, tags);
     aggregator = function;
     this.rate = rate;
@@ -298,7 +308,12 @@ final class TsdbQuery implements Query {
               continue rowsLoop;
           Span datapoints = spans.get(key);
           if (datapoints == null) {
-            datapoints = new Span(tsdb);
+            if (metricName.startsWith("system.uptime.availability")) {
+              LOG.info("Initializing span gap fixer for availability");
+              datapoints = new GapFixSpan(tsdb, 3600, 0.0, false, start_time, end_time); 
+            } else {
+              datapoints = new Span(tsdb);
+            }
             spans.put(key, datapoints);
           }
           datapoints.addRow(tsdb.compact(row));
@@ -432,7 +447,8 @@ final class TsdbQuery implements Query {
     if (tags.size() > 0 || group_bys != null) {
       createAndSetFilter(scanner);
     }
-    scanner.setFamily(TSDB.FAMILY);
+    if (!this.noprint)
+      scanner.setFamily(TSDB.FAMILY);
     return scanner;
   }
 

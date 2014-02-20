@@ -30,7 +30,7 @@ import org.hbase.async.KeyValue;
  * <p>
  * This class stores a continuous sequence of {@link RowSeq}s in memory.
  */
-final class Span implements DataPoints {
+class Span implements DataPoints {
 
   private static final Logger LOG = LoggerFactory.getLogger(Span.class);
 
@@ -240,7 +240,7 @@ final class Span implements DataPoints {
   }
 
   /** Package private iterator method to access it as a Span.Iterator. */
-  Span.Iterator spanIterator() {
+  SeekableView spanIterator() {
     return new Span.Iterator();
   }
 
@@ -294,7 +294,7 @@ final class Span implements DataPoints {
   }
 
   /** Package private iterator method to access it as a DownsamplingIterator. */
-  Span.DownsamplingIterator downsampler(final int interval,
+  SeekableView downsampler(final int interval,
                                         final Aggregator downsampler) {
     return new Span.DownsamplingIterator(interval, downsampler);
   }

@@ -137,7 +137,7 @@ final class CliQuery {
     final ArrayList<String> plotparams = new ArrayList<String>();
     final ArrayList<Query> queries = new ArrayList<Query>();
     final ArrayList<String> plotoptions = new ArrayList<String>();
-    parseCommandLineQuery(args, tsdb, queries, plotparams, plotoptions);
+    parseCommandLineQuery(args, tsdb, queries, plotparams, plotoptions, false);
     if (queries.isEmpty()) {
       usage(null, "Not enough arguments, need at least one query.", 2);
     }
@@ -192,7 +192,8 @@ final class CliQuery {
                                     final TSDB tsdb,
                                     final ArrayList<Query> queries,
                                     final ArrayList<String> plotparams,
-                                    final ArrayList<String> plotoptions) {
+                                    final ArrayList<String> plotoptions,
+                                    boolean noprint) {
     final long start_ts = parseDate(args[0]);
     final long end_ts = (args.length > 3
                          && (args[1].charAt(0) != '+'
@@ -229,13 +230,13 @@ final class CliQuery {
       if (i < args.length && args[i].indexOf(' ', 1) > 0) {
         plotoptions.add(args[i++]);
       }
-      final Query query = tsdb.newQuery();
+      final Query query = tsdb.newQuery(noprint);
       query.setStartTime(start_ts);
       if (end_ts > 0) {
         query.setEndTime(end_ts);
       }
       query.setTimeSeries(metric, tags, agg, rate);
-      if (downsample) {
+      if (!noprint && downsample) {
         query.downsample(interval, sampler);
       }
       queries.add(query);

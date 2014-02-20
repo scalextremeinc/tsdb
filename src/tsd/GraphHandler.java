@@ -51,6 +51,7 @@ import net.opentsdb.stats.Histogram;
 import net.opentsdb.stats.StatsCollector;
 import net.opentsdb.uid.NoSuchUniqueName;
 import net.opentsdb.tsd.TaskExecutor;
+import net.opentsdb.core.GapFixDataPoints;
 
 /**
  * Stateless handler of HTTP graph requests (the {@code /q} endpoint).
@@ -807,7 +808,7 @@ final class GraphHandler implements HttpRpc {
     }
     try {
       final StringBuilder tagbuf = new StringBuilder();
-      for (final DataPoints dp : plot.getDataPoints()) {
+      for (DataPoints dp : plot.getDataPoints()) {
         String metric = dp.metricName();
         try {
             metric = java.net.URLEncoder.encode(metric, "UTF-8");

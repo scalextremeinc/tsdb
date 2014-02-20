@@ -112,7 +112,7 @@ final class Fsck {
     final short metric_width = Internal.metricWidth(tsdb);
 
     final ArrayList<Query> queries = new ArrayList<Query>();
-    CliQuery.parseCommandLineQuery(args, tsdb, queries, null, null);
+    CliQuery.parseCommandLineQuery(args, tsdb, queries, null, null, false);
     final StringBuilder buf = new StringBuilder();
     for (final Query query : queries) {
       final long start_time = System.nanoTime();
