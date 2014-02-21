@@ -1,5 +1,9 @@
 package net.opentsdb.core;
 
+import java.util.Map;
+import java.util.List;
+import java.util.NoSuchElementException;
+
 public class GapFixSpan extends Span {
 
     private final long interval;

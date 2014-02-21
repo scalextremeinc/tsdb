@@ -49,6 +49,7 @@ tsdb_SRC := \
 	src/core/WritableDataPoints.java	\
 	src/core/GapFixDataPoints.java	\
 	src/core/GapFixSpan.java	\
+	src/core/EmptySpan.java	\
 	src/graph/Plot.java	\
 	src/stats/Histogram.java	\
 	src/stats/StatsCollector.java	\

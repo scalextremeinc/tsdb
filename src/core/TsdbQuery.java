@@ -309,7 +309,7 @@ final class TsdbQuery implements Query {
           Span datapoints = spans.get(key);
           if (datapoints == null) {
             if (metricName.startsWith("system.uptime.availability")) {
-              LOG.info("Initializing span gap fixer for availability");
+              LOG.info("AVAILABILITY: initializing span gap fixer");
               datapoints = new GapFixSpan(tsdb, 3600, 0.0, false, start_time, end_time); 
             } else {
               datapoints = new Span(tsdb);
@@ -333,7 +333,77 @@ final class TsdbQuery implements Query {
     if (nrows == 0) {
       return null;
     }
+    if (metricName.startsWith("system.uptime.availability")) {
+        addEmptySpansAvailability(spans);
+    }
     return spans;
+  }
+
+  /**
+   * Adds empty spans for missing aggregate series.
+   * Function specific for availability metric.
+   */
+  private void addEmptySpansAvailability(TreeMap<byte[], Span> spans) {
+      byte[] key = new byte[19];
+      byte[] b = new byte[3];
+      final short metric_width = tsdb.metrics.width();
+      final short name_width = tsdb.tag_names.width();
+      final short value_width = tsdb.tag_values.width();
+      final short tagsize = (short) (name_width + value_width);
+      for (final byte[] tag_id_g : group_bys) {
+          for (byte[] value_id_g : group_by_values.get(tag_id_g)) {
+              for (byte[] tag_id : tags) {
+                  // metric + 0 + tag_id_g + value_id_g + tag_id 
+                  int i = 0;
+                  System.arraycopy(metric, 0, key, i, metric_width);
+                  i += metric_width;
+
+                  // timestamp as 0
+                  key[i++] = 0;
+                  key[i++] = 0;
+                  key[i++] = 0;
+                  key[i++] = 0;
+
+                  // tags are sorted
+                  System.arraycopy(tag_id, 0, b, 0, 3);
+                  if (Bytes.memcmp(b, tag_id_g) < 0) {
+                      System.arraycopy(tag_id, 0, key, i, tagsize);
+                      i += tagsize;
+                      System.arraycopy(tag_id_g, 0, key, i, name_width);
+                      i += name_width;
+                      System.arraycopy(value_id_g, 0, key, i, value_width);
+                  } else {
+                      System.arraycopy(tag_id_g, 0, key, i, name_width);
+                      i += name_width;
+                      System.arraycopy(value_id_g, 0, key, i, value_width);
+                      i += value_width;
+                      System.arraycopy(tag_id, 0, key, i, tagsize);
+                  }
+                
+                  if (null == spans.get(key)) {
+                      EmptySpan span = new EmptySpan(tsdb, 3600, 0.0, false,
+                                  start_time, end_time, metricName);
+
+                      String tag_key = tsdb.tag_names.getName(tag_id_g);
+                      String tag_value = tsdb.tag_values.getName(value_id_g);
+                      span.addTag(tag_key, tag_value);
+
+                      System.arraycopy(tag_id, 0, b, 0, 3);
+                      String tag_key2 = tsdb.tag_names.getName(b);
+                      System.arraycopy(tag_id, 3, b, 0, 3);
+                      String tag_value2 = tsdb.tag_values.getName(b);
+                      span.addTag(tag_key2, tag_value2);
+
+                      LOG.info("AVAILABILITY: missing key: " + Arrays.toString(key)
+                              + ", metric: " + tsdb.metrics.getName(metric)
+                              + ", key: " + tag_key + ", value: " + tag_value
+                              + ", key2: " + tag_key2 + ", value2: " + tag_value2);
+
+                      spans.put(key, span); 
+                  }
+              } 
+          }
+      }
   }
 
   /**
