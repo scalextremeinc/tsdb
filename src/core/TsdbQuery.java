@@ -339,6 +339,8 @@ final class TsdbQuery implements Query {
     return spans;
   }
 
+  private final static byte[] ZERO_INT = {0, 0, 0, 0};
+
   /**
    * Adds empty spans for missing aggregate series.
    * Function specific for availability metric.
@@ -359,10 +361,8 @@ final class TsdbQuery implements Query {
                   i += metric_width;
 
                   // timestamp as 0
-                  key[i++] = 0;
-                  key[i++] = 0;
-                  key[i++] = 0;
-                  key[i++] = 0;
+                  System.arraycopy(ZERO_INT, 0, key, i, 4);
+                  i += 4;
 
                   // tags are sorted
                   System.arraycopy(tag_id, 0, b, 0, 3);
