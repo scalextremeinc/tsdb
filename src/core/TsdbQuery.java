@@ -330,11 +330,11 @@ final class TsdbQuery implements Query {
       scanlatency.add(hbase_time);
     }
     LOG.info(this + " matched " + nrows + " rows in " + spans.size() + " spans");
+    if (metricName.startsWith("system.uptime.availability")) {
+        nrows += addEmptySpansAvailability(spans);
+    }
     if (nrows == 0) {
       return null;
-    }
-    if (metricName.startsWith("system.uptime.availability")) {
-        addEmptySpansAvailability(spans);
     }
     return spans;
   }
@@ -345,10 +345,11 @@ final class TsdbQuery implements Query {
    * Adds empty spans for missing aggregate series.
    * Function specific for availability metric.
    */
-  private void addEmptySpansAvailability(TreeMap<byte[], Span> spans) {
+  private int addEmptySpansAvailability(TreeMap<byte[], Span> spans) {
       if (null == group_bys || null == tags || null == group_by_values)
-          return;
+          return 0;
 
+      int nrows = 0;
       byte[] key = new byte[19];
       byte[] b = new byte[3];
       final short metric_width = tsdb.metrics.width();
@@ -403,10 +404,12 @@ final class TsdbQuery implements Query {
                               + ", key2: " + tag_key2 + ", value2: " + tag_value2);
 
                       spans.put(key, span); 
+                      nrows++;
                   }
               } 
           }
       }
+      return nrows;
   }
 
   /**
