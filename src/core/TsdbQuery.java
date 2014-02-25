@@ -346,6 +346,9 @@ final class TsdbQuery implements Query {
    * Function specific for availability metric.
    */
   private void addEmptySpansAvailability(TreeMap<byte[], Span> spans) {
+      if (null == group_bys || null == tags || null == group_by_values)
+          return;
+
       byte[] key = new byte[19];
       byte[] b = new byte[3];
       final short metric_width = tsdb.metrics.width();
