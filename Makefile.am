@@ -65,6 +65,7 @@ tsdb_SRC := \
 	src/tsd/ConnectionManager.java	\
 	src/tsd/GnuplotException.java	\
 	src/tsd/GraphHandler.java	\
+	src/tsd/DeleteHandler.java	\
 	src/tsd/HttpQuery.java	\
 	src/tsd/HttpRpc.java	\
 	src/tsd/LogsRpc.java	\

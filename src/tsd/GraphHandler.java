@@ -861,7 +861,7 @@ final class GraphHandler implements HttpRpc {
    * @throws BadRequestException if the query was malformed.
    * @throws IllegalArgumentException if the metric or tags were malformed.
    */
-  private static Query[] parseQuery(final TSDB tsdb, final HttpQuery query) {
+  public static Query[] parseQuery(final TSDB tsdb, final HttpQuery query) {
     final List<String> ms = query.getQueryStringParams("m");
     if (ms == null) {
       throw BadRequestException.missingParameter("m");
@@ -995,7 +995,7 @@ final class GraphHandler implements HttpRpc {
    * or -1 if there was no query string parameter named {@code paramname}.
    * @throws BadRequestException if the date is invalid.
    */
-  private static long getQueryStringDate(final HttpQuery query,
+  public static long getQueryStringDate(final HttpQuery query,
                                          final String paramname) {
     final String date = query.getQueryStringParam(paramname);
     if (date == null) {

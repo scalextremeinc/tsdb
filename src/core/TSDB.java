@@ -98,6 +98,14 @@ public final class TSDB {
     compactionq = new CompactionQueue(this);
   }
 
+  public HBaseClient getClient() {
+      return client;
+  }
+
+  public byte[] getTable() {
+      return table;
+  }
+
   /** Number of cache hits during lookups involving UIDs. */
   public int uidCacheHits() {
     return (metrics.cacheHits() + tag_names.cacheHits()
