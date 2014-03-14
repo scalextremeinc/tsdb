@@ -56,7 +56,7 @@ public class DeleteHandler implements HttpRpc {
                 }
             }
 
-            hquery.sendReply("{\"status\": \"SUCCESS\", \"deleted_rows\": \"" + deleted_rows + "\"}"); 
+            hquery.sendReply("{\"status\": \"SUCCESS\", \"deleted_rows\": " + deleted_rows + "}"); 
         } catch (IllegalArgumentException e) {
             hquery.badRequest(e.getMessage());
         } catch (Exception e) {
