@@ -17,6 +17,7 @@ import net.opentsdb.core.TSDB;
 public class DeleteHandler implements HttpRpc {
     
     public void execute(TSDB tsdb, HttpQuery hquery) throws IOException {
+        long deleted_rows = 0;
         try {
             final long start_time = GraphHandler.getQueryStringDate(hquery, "start");
             if (start_time == -1) {
@@ -50,11 +51,12 @@ public class DeleteHandler implements HttpRpc {
                         byte[] key = row.get(0).key();
                         DeleteRequest del = new DeleteRequest(tsdb.getTable(), key);
                         client.delete(del);
+                        deleted_rows++;
                     }
                 }
             }
 
-            hquery.sendReply("SUCCESS"); 
+            hquery.sendReply("{\"status\": \"SUCCESS\", \"deleted_rows\": \"" + deleted_rows + "\"}"); 
         } catch (IllegalArgumentException e) {
             hquery.badRequest(e.getMessage());
         } catch (Exception e) {
