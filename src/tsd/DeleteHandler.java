@@ -31,6 +31,8 @@ public class DeleteHandler implements HttpRpc {
             Query[] queries = GraphHandler.parseQuery(tsdb, hquery);
             HBaseClient client = tsdb.getClient();
             for (final Query query : queries) {
+                if (null == query)
+                    continue;
                 try {
                     query.setStartTime(start_time);
                 } catch (IllegalArgumentException e) {
