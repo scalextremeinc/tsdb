@@ -44,6 +44,8 @@ public class DeleteHandler implements HttpRpc {
                 } catch (IllegalArgumentException e) {
                     throw new BadRequestException("end time: " + e.getMessage());
                 }
+                // don't pull data with scanner, just get keys
+                query.setNoprint(true);
                 final Scanner scanner = Internal.getScanner(query);
                 ArrayList<ArrayList<KeyValue>> rows;
                 while ((rows = scanner.nextRows().joinUninterruptibly()) != null) {

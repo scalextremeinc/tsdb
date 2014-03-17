@@ -137,6 +137,10 @@ final class TsdbQuery implements Query {
     this.noprint = noprint;
   }
 
+  public void setNoprint(boolean noprint) {
+    this.noprint = noprint;
+  }
+
   public void setStartTime(final long timestamp) {
     if ((timestamp & 0xFFFFFFFF00000000L) != 0) {
       throw new IllegalArgumentException("Invalid timestamp: " + timestamp);

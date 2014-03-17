@@ -104,4 +104,6 @@ public interface Query {
    */
   DataPoints[] run() throws HBaseException;
 
+  void setNoprint(boolean noprint);
+
 }
