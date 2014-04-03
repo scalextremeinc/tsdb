@@ -276,6 +276,12 @@ final class TsdbQuery implements Query {
     return groupByAndAggregate(findSpans());
   }
 
+  private boolean isAvailability(String metric) {
+      return metric.startsWith("system.uptime.availability")
+          || metric.contains(".avail.percent")
+          || metric.contains(".avail.second");
+  }
+
   /**
    * Finds all the {@link Span}s that match this query.
    * This is what actually scans the HBase table and loads the data into
@@ -295,6 +301,8 @@ final class TsdbQuery implements Query {
     int hbase_time = 0;  // milliseconds.
     long starttime = System.nanoTime();
     final Scanner scanner = getScanner();
+    // check if metric is availability metric
+    boolean availability = isAvailability(metricName);
     try {
       ArrayList<ArrayList<KeyValue>> rows;
       while ((rows = scanner.nextRows().joinUninterruptibly()) != null) {
@@ -312,7 +320,7 @@ final class TsdbQuery implements Query {
               continue rowsLoop;
           Span datapoints = spans.get(key);
           if (datapoints == null) {
-            if (metricName.startsWith("system.uptime.availability")) {
+            if (availability) {
               LOG.info("AVAILABILITY: initializing span gap fixer");
               datapoints = new GapFixSpan(tsdb, 3600, 0.0, false, start_time, end_time); 
             } else {
@@ -334,7 +342,7 @@ final class TsdbQuery implements Query {
       scanlatency.add(hbase_time);
     }
     LOG.info(this + " matched " + nrows + " rows in " + spans.size() + " spans");
-    if (metricName.startsWith("system.uptime.availability")) {
+    if (availability) {
         nrows += addEmptySpansAvailability(spans);
     }
     if (nrows == 0) {
