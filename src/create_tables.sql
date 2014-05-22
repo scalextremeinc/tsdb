@@ -31,9 +31,8 @@ CREATE TABLE IF NOT EXISTS `tsdb` (
   `t3_valueid` bigint unsigned,
   `t4_valueid` bigint unsigned,
   `t5_valueid` bigint unsigned,
-  `t6_valueid` bigint unsigned
+  `t6_valueid` bigint unsigned,
+  KEY `index1` (`metricid`, `hostid`),
+  KEY `index2` (`hostid`, `metricid`)
 ) ENGINE=TokuDB DEFAULT CHARSET=utf8;
-
-CREATE INDEX IF NOT EXISTS index1 ON tsdb (metricid,hostid);
-CREATE INDEX IF NOT EXISTS index2 ON tsdb (hostid,metricid);
 
