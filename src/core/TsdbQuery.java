@@ -537,7 +537,6 @@ final class TsdbQuery implements Query {
       int i = 0;
       // TODO(tsuna): The following loop has a quadratic behavior.  We can
       // make it much better since both the row key and group_bys are sorted.
-      LOG.info("ROW: " + Arrays.toString(row));
       for (final byte[] tag_id : group_bys) {
     	Boolean is_aggregate = aggregate_tag.get(tag_id);
     	if (is_aggregate != null && is_aggregate) {
