@@ -22,6 +22,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.lang.Boolean;
 
 import org.slf4j.Logger;
@@ -59,6 +61,8 @@ final class TsdbQuery implements Query {
    * We use this one because it preserves every possible byte unchanged.
    */
   private static final Charset CHARSET = Charset.forName("ISO-8859-1");
+
+  private static final Pattern availPattern = Pattern.compile("avail[^0-9]*([0-9]+)");
 
   /** The TSDB we belong to. */
   private final TSDB tsdb;
@@ -277,9 +281,7 @@ final class TsdbQuery implements Query {
   }
 
   private boolean isAvailability(String metric) {
-      return metric.startsWith("system.uptime.availability")
-          || metric.contains(".avail.percent")
-          || metric.contains(".avail.second");
+      return metric.startsWith("system.uptime.availability") || metric.contains(".avail");
   }
 
   /**
@@ -299,6 +301,7 @@ final class TsdbQuery implements Query {
       new TreeMap<byte[], Span>(new SpanCmp(metric_width));
     int nrows = 0;
     int hbase_time = 0;  // milliseconds.
+    long interval = 3600; 
     long starttime = System.nanoTime();
     final Scanner scanner = getScanner();
     // check if metric is availability metric
@@ -321,8 +324,11 @@ final class TsdbQuery implements Query {
           Span datapoints = spans.get(key);
           if (datapoints == null) {
             if (availability) {
-              LOG.info("AVAILABILITY: initializing span gap fixer");
-              datapoints = new GapFixSpan(tsdb, 3600, 0.0, false, start_time, end_time); 
+              Matcher matcher = availPattern.matcher(metricName);
+              if (matcher.find())
+                interval = Long.parseLong(matcher.group(1));
+              LOG.info("AVAILABILITY: initializing span gap fixer, interval: " + interval);
+              datapoints = new GapFixSpan(tsdb, interval, 0.0, false, start_time, end_time); 
             } else {
               datapoints = new Span(tsdb);
             }
@@ -343,7 +349,7 @@ final class TsdbQuery implements Query {
     }
     LOG.info(this + " matched " + nrows + " rows in " + spans.size() + " spans");
     if (availability) {
-        nrows += addEmptySpansAvailability(spans);
+        nrows += addEmptySpansAvailability(spans, interval);
     }
     if (nrows == 0) {
       return null;
@@ -355,100 +361,133 @@ final class TsdbQuery implements Query {
 
   /**
    * Adds empty spans for missing aggregate series.
+   * It checks if all posible timeseries exist, if
+   * not creates empty span for missing serie.
+   * Empty span returns zeros for each availability datapoint.
    * Function specific for availability metric.
-   * It assumes that availability has two tags: host, t0
    */
-  private int addEmptySpansAvailability(TreeMap<byte[], Span> spans) {
+  private int addEmptySpansAvailability(TreeMap<byte[], Span> spans, long interval) {
       int nrows = 0;
       final short metric_width = tsdb.metrics.width();
       final short name_width = tsdb.tag_names.width();
       final short value_width = tsdb.tag_values.width();
-      byte[] key_buf = new byte[19];
+      byte[] key_buf;
       byte[] tag_buf = new byte[name_width];
 
-      byte[] host_key = tsdb.tag_names.getId("host");
-      byte[] t0_key = tsdb.tag_names.getId("t0");
-      byte[][] host_values = new byte[0][0];
-      byte[][] t0_values = new byte[0][0];
+      ByteMap<ArrayList<byte[]>> tags_map = new ByteMap<ArrayList<byte[]>>();
 
       for (byte[] tag : tags) {
-          System.arraycopy(tag, 0, tag_buf, 0, name_width);
-          if (Bytes.memcmp(tag_buf, t0_key) == 0) {
-              byte[] value_buf = new byte[value_width]; 
-              System.arraycopy(tag, name_width, value_buf, 0, value_width);
-              t0_values = new byte[][] {value_buf};
-          } else if (Bytes.memcmp(tag_buf, host_key) == 0) {
-              byte[] value_buf = new byte[value_width]; 
-              System.arraycopy(tag, name_width, value_buf, 0, value_width);
-              host_values = new byte[][] {value_buf};
+          LOG.info("AVAILABILITY: tag: " + Arrays.toString(tag));
+          byte[] tagk = new byte[name_width];
+          byte[] tagv = new byte[value_width];
+          System.arraycopy(tag, 0, tagk, 0, name_width);
+          System.arraycopy(tag, name_width, tagv, 0, value_width);
+          ArrayList<byte[]> tagsv = tags_map.get(tagk);
+          if (null == tagsv) {
+              tagsv = new ArrayList<byte[]>();
+              tags_map.put(tagk, tagsv);
           }
+          tagsv.add(tagv);
       }
 
       if (group_bys != null && group_by_values != null) {
-          if (0 == host_values.length) {
-              host_values = group_by_values.get(host_key);
-          }
-          if (0 == t0_values.length) {
-              t0_values = group_by_values.get(t0_key);
+          for (byte[] tagk : group_bys) {
+              LOG.info("AVAILABILITY: group_by tagk: " + Arrays.toString(tagk));
+              ArrayList<byte[]> tagsv = tags_map.get(tagk);
+              if (null == tagsv) {
+                  tagsv = new ArrayList<byte[]>();
+                  tags_map.put(tagk, tagsv);
+              }
+              for (byte[] tagv : group_by_values.get(tagk)) {
+                  LOG.info("AVAILABILITY: group_by tagk: " + Arrays.toString(tagk) + ", tagv: " + Arrays.toString(tagv));
+                  tagsv.add(tagv);
+              }
           }
       } 
 
-      for (byte[] host_value : host_values) {
-          for (byte[] t0_value : t0_values) {
-              // key is:
-              // metric + 0 + t0_key + t0_value + host_key + host_value 
-              // or:
-              // metric + 0 + host_key + host_value + t0_key + t0_value 
+      ArrayList<byte[]> tag_keys = new ArrayList<byte[]>(tags_map.keySet());
+      int[] index = new int[tag_keys.size()];
 
-              int i = 0;
-              System.arraycopy(metric, 0, key_buf, i, metric_width);
-              i += metric_width;
+      LOG.info("AVAILABILITY: tag keys size: " + tag_keys.size());
 
-              // timestamp as 0
-              System.arraycopy(ZERO_INT, 0, key_buf, i, 4);
-              i += 4;
 
-              // tags are sorted
-              if (Bytes.memcmp(t0_key, host_key) < 0) {
-                  System.arraycopy(t0_key, 0, key_buf, i, name_width);
-                  i += name_width;
-                  System.arraycopy(t0_value, 0, key_buf, i, value_width);
-                  i += value_width;
-                  System.arraycopy(host_key, 0, key_buf, i, name_width);
-                  i += name_width;
-                  System.arraycopy(host_value, 0, key_buf, i, value_width);
-                  i += value_width;
+      ArrayList<byte[]> row_tags = new ArrayList<byte[]>();
+
+      int i = 0;
+      int j = index.length - 1;
+      while (tag_keys.size() > 0) {
+          byte[] key = tag_keys.get(i);
+          ArrayList<byte[]> values = tags_map.get(key);
+
+          if (i == j) {
+              if (index[i] == values.size() - 1) {
+                  index[i] = 0;
+                  if (j > 0)
+                      j--;
               } else {
-                  System.arraycopy(host_key, 0, key_buf, i, name_width);
-                  i += name_width;
-                  System.arraycopy(host_value, 0, key_buf, i, value_width);
-                  i += value_width;
-                  System.arraycopy(t0_key, 0, key_buf, i, name_width);
-                  i += name_width;
-                  System.arraycopy(t0_value, 0, key_buf, i, value_width);
-                  i += value_width;
+                  index[i] = index[i] + 1;
+                  if (j < index.length - 1)
+                      j++;
+              }
+          }
+
+          byte[] tag_kv = new byte[name_width + value_width];
+          System.arraycopy(key, 0, tag_kv, 0, name_width);
+          System.arraycopy(values.get(index[i]), 0, tag_kv, name_width, value_width);
+          row_tags.add(tag_kv);
+
+          LOG.info("AVAILABILITY: i: " + i + ", j: " + j + ", index[i]: " + index[i]);
+
+          if (i == index.length - 1) {
+              key_buf = new byte[metric_width + 4 + (name_width + value_width) * row_tags.size()];
+              int n = 0;
+              System.arraycopy(metric, 0, key_buf, n, metric_width);
+              n += metric_width;
+              // set timestamp as zero
+              System.arraycopy(ZERO_INT, 0, key_buf, n, 4);
+              n += 4;
+              Collections.sort(row_tags, Bytes.MEMCMP);
+              for (byte[] kv : row_tags) {
+                  System.arraycopy(kv, 0, key_buf, n, name_width + value_width);
+                  n += name_width + value_width;
               }
 
+              LOG.info("AVAILABILITY: checking key_buf: " + Arrays.toString(key_buf));
               if (null == spans.get(key_buf)) {
-                  EmptySpan span = new EmptySpan(tsdb, 3600, 0.0, false,
+                  EmptySpan span = new EmptySpan(tsdb, interval, 0.0, false,
                           start_time, end_time, metricName);
 
-                  String t0_key_str = tsdb.tag_names.getName(t0_key);
-                  String t0_value_str = tsdb.tag_values.getName(t0_value);
-                  span.addTag(t0_key_str, t0_value_str);
-
-                  String host_key_str = tsdb.tag_names.getName(host_key);
-                  String host_value_str = tsdb.tag_values.getName(host_value);
-                  span.addTag(host_key_str, host_value_str);
+                  for (byte[] kv : row_tags) {
+                      byte[] k = new byte[name_width];
+                      byte[] v = new byte[value_width];
+                      System.arraycopy(kv, 0, k, 0, name_width);
+                      System.arraycopy(kv, name_width, v, 0, value_width);
+                      String key_str = tsdb.tag_names.getName(k);
+                      String value_str = tsdb.tag_values.getName(v);
+                      span.addTag(key_str, value_str);
+                  }
 
                   LOG.info("AVAILABILITY: missing key: " + Arrays.toString(key_buf)
-                          + ", metric: " + metricName + ", t0 value: " + t0_value_str
-                          + ", host value2: " + host_value_str);
+                          + ", metric: " + metricName);
 
                   spans.put(key_buf, span); 
                   nrows++;
               }
-          } 
+
+              row_tags = new ArrayList<byte[]>();
+          }
+
+          boolean index_done = true;
+          for (int a = 0; a < index.length; a++) {
+              if (index[a] < tags_map.get(tag_keys.get(a)).size() - 1) {
+                  index_done = false;
+                  break;
+              }
+          }
+          if (i == index.length -1 && index_done)
+              break;
+
+          i = (i + 1) % index.length;
       }
 
       return nrows;
@@ -498,6 +537,7 @@ final class TsdbQuery implements Query {
       int i = 0;
       // TODO(tsuna): The following loop has a quadratic behavior.  We can
       // make it much better since both the row key and group_bys are sorted.
+      LOG.info("ROW: " + Arrays.toString(row));
       for (final byte[] tag_id : group_bys) {
     	Boolean is_aggregate = aggregate_tag.get(tag_id);
     	if (is_aggregate != null && is_aggregate) {
