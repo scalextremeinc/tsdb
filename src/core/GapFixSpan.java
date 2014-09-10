@@ -30,7 +30,7 @@ public class GapFixSpan extends Span {
     SeekableView downsampler(final int interval, final Aggregator downsampler) {
         return new GapFixDataPoints.GapFixIterator(
                 new Span.DownsamplingIterator(interval, downsampler),
-                interval, fixValue, isInteger, startTime, endTime);
+                this.interval, fixValue, isInteger, startTime, endTime);
     }
 
 }
