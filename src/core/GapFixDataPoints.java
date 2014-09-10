@@ -4,7 +4,12 @@ import java.util.Map;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class GapFixDataPoints implements DataPoints {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TsdbQuery.class);
 
     private final DataPoints source;
     private final long interval;
@@ -89,13 +94,17 @@ public class GapFixDataPoints implements DataPoints {
         // Iterator interface //
 
         public boolean hasNext() {
-            return sourceIterator.hasNext() || lastTimestamp + interval <= endTime;
+            boolean sourceHasNext = sourceIterator.hasNext();
+            LOG.info("hasNext, lastTimestamp: " + lastTimestamp + ", interval: " + interval + ", startTime: " + startTime + "endTime: " + endTime + ", sourceHasNext: " + sourceHasNext);
+            return sourceHasNext || lastTimestamp + interval <= endTime;
         }
 
         public DataPoint next() {
             if (!hasNext()) {
                 throw new NoSuchElementException("no more elements");
             }
+
+            LOG.info("next, lastTimestamp: " + lastTimestamp + ", interval: " + interval + ", startTime: " + startTime + ", endTime: " + endTime); 
 
             if (0 == lastTimestamp) {
                 currentPoint = sourceIterator.next();
