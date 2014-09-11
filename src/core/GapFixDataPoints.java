@@ -98,15 +98,13 @@ public class GapFixDataPoints implements DataPoints {
                 throw new NoSuchElementException("no more elements");
             }
 
-            Thread.currentThread().dumpStack();
-
             if (0 == lastTimestamp) {
                 currentPoint = sourceIterator.next();
                 if (startTime + interval > currentPoint.timestamp()) {
                     lastTimestamp = currentPoint.timestamp();
                     return currentPoint;
                 } else {
-                    lastTimestamp = startTime - (startTime % interval);
+                    lastTimestamp = (startTime - (startTime % interval)) + interval;
                     return this;
                 }
             }

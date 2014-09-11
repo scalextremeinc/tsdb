@@ -377,7 +377,6 @@ final class TsdbQuery implements Query {
       ByteMap<ArrayList<byte[]>> tags_map = new ByteMap<ArrayList<byte[]>>();
 
       for (byte[] tag : tags) {
-          LOG.info("AVAILABILITY: tag: " + Arrays.toString(tag));
           byte[] tagk = new byte[name_width];
           byte[] tagv = new byte[value_width];
           System.arraycopy(tag, 0, tagk, 0, name_width);
@@ -392,14 +391,12 @@ final class TsdbQuery implements Query {
 
       if (group_bys != null && group_by_values != null) {
           for (byte[] tagk : group_bys) {
-              LOG.info("AVAILABILITY: group_by tagk: " + Arrays.toString(tagk));
               ArrayList<byte[]> tagsv = tags_map.get(tagk);
               if (null == tagsv) {
                   tagsv = new ArrayList<byte[]>();
                   tags_map.put(tagk, tagsv);
               }
               for (byte[] tagv : group_by_values.get(tagk)) {
-                  LOG.info("AVAILABILITY: group_by tagk: " + Arrays.toString(tagk) + ", tagv: " + Arrays.toString(tagv));
                   tagsv.add(tagv);
               }
           }
@@ -408,7 +405,6 @@ final class TsdbQuery implements Query {
       ArrayList<byte[]> tag_keys = new ArrayList<byte[]>(tags_map.keySet());
       int[] index = new int[tag_keys.size()];
 
-      LOG.info("AVAILABILITY: tag keys size: " + tag_keys.size());
 
 
       ArrayList<byte[]> row_tags = new ArrayList<byte[]>();
@@ -436,8 +432,6 @@ final class TsdbQuery implements Query {
           System.arraycopy(values.get(index[i]), 0, tag_kv, name_width, value_width);
           row_tags.add(tag_kv);
 
-          LOG.info("AVAILABILITY: i: " + i + ", j: " + j + ", index[i]: " + index[i]);
-
           if (i == index.length - 1) {
               key_buf = new byte[metric_width + 4 + (name_width + value_width) * row_tags.size()];
               int n = 0;
@@ -452,7 +446,6 @@ final class TsdbQuery implements Query {
                   n += name_width + value_width;
               }
 
-              LOG.info("AVAILABILITY: checking key_buf: " + Arrays.toString(key_buf));
               if (null == spans.get(key_buf)) {
                   EmptySpan span = new EmptySpan(tsdb, interval, 0.0, false,
                           start_time, end_time, metricName);
@@ -466,9 +459,6 @@ final class TsdbQuery implements Query {
                       String value_str = tsdb.tag_values.getName(v);
                       span.addTag(key_str, value_str);
                   }
-
-                  LOG.info("AVAILABILITY: missing key: " + Arrays.toString(key_buf)
-                          + ", metric: " + metricName);
 
                   spans.put(key_buf, span); 
                   nrows++;
