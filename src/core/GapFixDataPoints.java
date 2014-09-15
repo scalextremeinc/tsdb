@@ -104,7 +104,7 @@ public class GapFixDataPoints implements DataPoints {
                     lastTimestamp = currentPoint.timestamp();
                     return currentPoint;
                 } else {
-                    lastTimestamp = (startTime - (startTime % interval)) + interval;
+                    lastTimestamp = startTime - (startTime % interval);
                     return this;
                 }
             }

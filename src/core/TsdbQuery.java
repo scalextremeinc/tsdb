@@ -130,6 +130,9 @@ final class TsdbQuery implements Query {
 
   private boolean noprint;
 
+  private Boolean isAvail;
+  private Long availInterval;
+
   /** Constructor. */
   public TsdbQuery(final TSDB tsdb) {
     this.tsdb = tsdb;
@@ -145,13 +148,16 @@ final class TsdbQuery implements Query {
     this.noprint = noprint;
   }
 
-  public void setStartTime(final long timestamp) {
+  public void setStartTime(long timestamp) {
     if ((timestamp & 0xFFFFFFFF00000000L) != 0) {
       throw new IllegalArgumentException("Invalid timestamp: " + timestamp);
     } else if (end_time != UNSET && timestamp >= getEndTime()) {
       throw new IllegalArgumentException("new start time (" + timestamp
           + ") is greater than or equal to end time: " + getEndTime());
     }
+    // align availability to its interval
+    if (isAvailability())
+        timestamp = timestamp  - (timestamp % getAvailInterval());
     // Keep the 32 bits.
     start_time = (int) timestamp;
   }
@@ -163,13 +169,16 @@ final class TsdbQuery implements Query {
     return start_time & 0x00000000FFFFFFFFL;
   }
 
-  public void setEndTime(final long timestamp) {
+  public void setEndTime(long timestamp) {
     if ((timestamp & 0xFFFFFFFF00000000L) != 0) {
       throw new IllegalArgumentException("Invalid timestamp: " + timestamp);
     } else if (start_time != UNSET && timestamp <= getStartTime()) {
       throw new IllegalArgumentException("new end time (" + timestamp
           + ") is less than or equal to start time: " + getStartTime());
     }
+    // align availability to its interval
+    if (isAvailability())
+        timestamp = timestamp  - (timestamp % getAvailInterval()) + getAvailInterval();
     // Keep the 32 bits.
     end_time = (int) timestamp;
   }
@@ -280,8 +289,24 @@ final class TsdbQuery implements Query {
     return groupByAndAggregate(findSpans());
   }
 
-  private boolean isAvailability(String metric) {
-      return metric.startsWith("system.uptime.availability") || metric.contains(".avail");
+  private boolean isAvailability() {
+      if (null == isAvail)
+          isAvail = metricName.startsWith("system.uptime.availability")
+              || metricName.contains(".avail");
+
+      return isAvail;
+  }
+
+  private long getAvailInterval() {
+      if (null == availInterval) {
+          Matcher matcher = availPattern.matcher(metricName);
+          if (matcher.find())
+              availInterval = Long.parseLong(matcher.group(1));
+          else
+              availInterval = 3600L; 
+      }
+
+      return availInterval;
   }
 
   /**
@@ -301,11 +326,10 @@ final class TsdbQuery implements Query {
       new TreeMap<byte[], Span>(new SpanCmp(metric_width));
     int nrows = 0;
     int hbase_time = 0;  // milliseconds.
-    long interval = 3600; 
     long starttime = System.nanoTime();
     final Scanner scanner = getScanner();
     // check if metric is availability metric
-    boolean availability = isAvailability(metricName);
+    boolean availability = isAvailability();
     try {
       ArrayList<ArrayList<KeyValue>> rows;
       while ((rows = scanner.nextRows().joinUninterruptibly()) != null) {
@@ -324,11 +348,8 @@ final class TsdbQuery implements Query {
           Span datapoints = spans.get(key);
           if (datapoints == null) {
             if (availability) {
-              Matcher matcher = availPattern.matcher(metricName);
-              if (matcher.find())
-                interval = Long.parseLong(matcher.group(1));
-              LOG.info("AVAILABILITY: initializing span gap fixer, interval: " + interval);
-              datapoints = new GapFixSpan(tsdb, interval, 0.0, false, start_time, end_time); 
+              LOG.info("AVAILABILITY: initializing span gap fixer, interval: " + getAvailInterval());
+              datapoints = new GapFixSpan(tsdb, getAvailInterval(), 0.0, false, getStartTime(), getEndTime()); 
             } else {
               datapoints = new Span(tsdb);
             }
@@ -349,7 +370,7 @@ final class TsdbQuery implements Query {
     }
     LOG.info(this + " matched " + nrows + " rows in " + spans.size() + " spans");
     if (availability) {
-        nrows += addEmptySpansAvailability(spans, interval);
+        nrows += addEmptySpansAvailability(spans, getAvailInterval());
     }
     if (nrows == 0) {
       return null;
@@ -613,7 +634,7 @@ final class TsdbQuery implements Query {
     // but this doesn't really matter.
     // Additionally, in case our sample_interval is large, we need to look
     // even further before/after, so use that too.
-    final long ts = getStartTime() - Const.MAX_TIMESPAN * 2 - sample_interval;
+    long ts = getStartTime() - Const.MAX_TIMESPAN * 2 - sample_interval;
     return ts > 0 ? ts : 0;
   }
 
@@ -627,7 +648,8 @@ final class TsdbQuery implements Query {
     // again that doesn't really matter.
     // Additionally, in case our sample_interval is large, we need to look
     // even further before/after, so use that too.
-    return getEndTime() + Const.MAX_TIMESPAN + 1 + sample_interval;
+    long ts = getEndTime() + Const.MAX_TIMESPAN + 1 + sample_interval;
+    return ts;
   }
 
   /**
