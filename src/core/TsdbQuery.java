@@ -157,7 +157,7 @@ final class TsdbQuery implements Query {
     }
     // align availability to its interval
     if (isAvailability())
-        timestamp = timestamp  - (timestamp % getAvailInterval());
+        timestamp = timestamp  - (timestamp % getAvailInterval()) - getAvailInterval();
     // Keep the 32 bits.
     start_time = (int) timestamp;
   }
