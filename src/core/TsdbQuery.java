@@ -291,8 +291,9 @@ final class TsdbQuery implements Query {
 
   private boolean isAvailability() {
       if (null == isAvail)
-          isAvail = metricName.startsWith("system.uptime.availability")
-              || metricName.contains(".avail");
+          isAvail = metricName.contains("system.uptime.availability")
+              || (metricName.contains(".avail")
+                      && (metricName.contains(".percent") || metricName.contains(".second")));
 
       return isAvail;
   }
