@@ -17,3 +17,7 @@ bin
 *.jar
 *.war
 *.ear
+*.sw?
+log
+nohup.out
+create.sh

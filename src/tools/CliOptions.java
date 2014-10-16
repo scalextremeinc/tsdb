@@ -119,5 +119,8 @@ final class CliOptions {
     return DataSourceUtil.createPooledDataSource(host, user, pass, db);
   }
 
+  static boolean isSql(final ArgP argp) {
+      return argp.get("--dbhost") != null;
+  }
 
 }

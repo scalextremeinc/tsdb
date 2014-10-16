@@ -123,39 +123,47 @@ final class TSDMain {
     setDirectoryInSystemProps("tsd.http.cachedir", argp.get("--cachedir"),
                               CREATE_IF_NEEDED, MUST_BE_WRITEABLE);
 
-    final NioServerSocketChannelFactory factory =
-        new NioServerSocketChannelFactory(Executors.newCachedThreadPool(),
-                                          Executors.newCachedThreadPool());
-    final HBaseClient client = CliOptions.clientFromOptions(argp);
-    final DataSource ds = CliOptions.dsFromOptions(argp);
+    final NioServerSocketChannelFactory factory = new NioServerSocketChannelFactory(
+            Executors.newCachedThreadPool(), Executors.newCachedThreadPool());
+
+    HBaseClient client = null;
     try {
-      // Make sure we don't even start if we can't find out tables.
-      //final String table = argp.get("--table", "tsdb");
-      //final String uidtable = argp.get("--uidtable", "tsdb-uid");
-      //client.ensureTableExists(table).joinUninterruptibly();
-      //client.ensureTableExists(uidtable).joinUninterruptibly();
+      DataSource ds = null;
+      TSDB tsdb = null;
+      if (CliOptions.isSql(argp)) {
+          ds = CliOptions.dsFromOptions(argp);
+          tsdb = new TsdbSql(ds, null);
+      } else {
+          // Make sure we don't even start if we can't find out tables.
+          client = CliOptions.clientFromOptions(argp);
+          final String table = argp.get("--table", "tsdb");
+          final String uidtable = argp.get("--uidtable", "tsdb-uid");
+          client.ensureTableExists(table).joinUninterruptibly();
+          client.ensureTableExists(uidtable).joinUninterruptibly();
+          client.setFlushInterval(flush_interval);
+          tsdb = new TsdbHbase(client, table, uidtable);
+      }
 
-      //client.setFlushInterval(flush_interval);
-      //final TSDB tsdb = new TsdbHbase(client, table, uidtable);
-      final TSDB tsdb = new TsdbSql(ds, null);
       registerShutdownHook(tsdb);
-      final ServerBootstrap server = new ServerBootstrap(factory);
 
+      final InetSocketAddress addr = new InetSocketAddress(Integer.parseInt(argp.get("--port")));
+
+      final ServerBootstrap server = new ServerBootstrap(factory);
       server.setPipelineFactory(new PipelineFactory(tsdb));
       server.setOption("child.tcpNoDelay", true);
       server.setOption("child.keepAlive", true);
       server.setOption("reuseAddress", true);
-
-      final InetSocketAddress addr =
-        new InetSocketAddress(Integer.parseInt(argp.get("--port")));
       server.bind(addr);
+
       log.info("Ready to serve on " + addr);
     } catch (Throwable e) {
       factory.releaseExternalResources();
-      try {
-        client.shutdown().joinUninterruptibly();
-      } catch (Exception e2) {
-        log.error("Failed to shutdown HBase client", e2);
+      if (client != null) {
+          try {
+              client.shutdown().joinUninterruptibly();
+          } catch (Exception e2) {
+              log.error("Failed to shutdown HBase client", e2);
+          }
       }
       throw new RuntimeException("Initialization failed", e);
     }

@@ -39,7 +39,7 @@ import net.opentsdb.stats.StatsCollector;
  * This class is the central class of OpenTSDB.  You use it to add new data
  * points or query the database.
  */
-public final class TsdbHbase implements TSDB{
+public final class TsdbHbase implements TSDB {
 
   static final byte[] FAMILY = { 't' };
 
