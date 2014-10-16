@@ -31,6 +31,16 @@ import net.opentsdb.core.IncomingDataPoints;
 
 import net.opentsdb.uid.sql.UniqueIdSql;
 
+/**
+ * Tsdb implementation which stores data in SQL database.
+ * It assumes that metrics are stored with "host" tag,
+ * and optional tags (max 7 tags) named: t0, t1 ... t6
+ *
+ * eg:
+ * system.cpu.load 1413473538 0.01 host=foo t0=percpu t1=avg1
+ * system.cpu.load 1413473538 0.02 host=foo t0=percpu t1=avg5
+ * system.cpu.load 1413473538 0.03 host=foo t0=percpu t1=avg15
+ */
 public final class TsdbSql implements TSDB {
     
     private static final Logger LOG = LoggerFactory.getLogger(TsdbSql.class);
