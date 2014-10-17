@@ -9,6 +9,7 @@ DEBUG="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002"
 export JAVA="java"
 export JVMARGS="-enableassertions -enablesystemassertions -Xmx3000m $DEBUG"
 
+set -x
 nohup $TSDB_DIR/build/tsdb tsd \
  --port=4242 \
  --staticroot=$TSDB_DIR/build/staticroot \

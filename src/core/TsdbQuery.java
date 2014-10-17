@@ -22,7 +22,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
-import java.lang.Boolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,8 @@ final public class TsdbQuery implements Query {
    */
   static final Charset CHARSET = Charset.forName("ISO-8859-1");
 
+  private static final Pattern availPattern = Pattern.compile("avail[^0-9]*([0-9]+)");
+
   /** The TSDB we belong to. */
   private final TSDB tsdb;
 
@@ -61,6 +64,7 @@ final public class TsdbQuery implements Query {
 
   /** ID of the metric being looked up. */
   private byte[] metric;
+  private String metricName;
 
   /**
    * Tags of the metrics being looked up.
@@ -116,6 +120,9 @@ final public class TsdbQuery implements Query {
   
   private StorageQuery storage_query;
 
+  private Boolean isAvail;
+  private Long availInterval;
+
   /** Constructor. */
   public TsdbQuery(final TSDB tsdb) {
     this.tsdb = tsdb;
@@ -125,13 +132,16 @@ final public class TsdbQuery implements Query {
       this.storage_query = storage_query;
   }
 
-  public void setStartTime(final long timestamp) {
+  public void setStartTime(long timestamp) {
     if ((timestamp & 0xFFFFFFFF00000000L) != 0) {
       throw new IllegalArgumentException("Invalid timestamp: " + timestamp);
     } else if (end_time != UNSET && timestamp >= getEndTime()) {
       throw new IllegalArgumentException("new start time (" + timestamp
           + ") is greater than or equal to end time: " + getEndTime());
     }
+    // align availability to its interval
+    if (isAvailability())
+        timestamp = timestamp  - (timestamp % getAvailInterval()) - getAvailInterval();
     // Keep the 32 bits.
     start_time = (int) timestamp;
   }
@@ -143,13 +153,16 @@ final public class TsdbQuery implements Query {
     return start_time & 0x00000000FFFFFFFFL;
   }
 
-  public void setEndTime(final long timestamp) {
+  public void setEndTime(long timestamp) {
     if ((timestamp & 0xFFFFFFFF00000000L) != 0) {
       throw new IllegalArgumentException("Invalid timestamp: " + timestamp);
     } else if (start_time != UNSET && timestamp <= getStartTime()) {
       throw new IllegalArgumentException("new end time (" + timestamp
           + ") is less than or equal to start time: " + getStartTime());
     }
+    // align availability to its interval
+    if (isAvailability())
+        timestamp = timestamp  - (timestamp % getAvailInterval()) + getAvailInterval();
     // Keep the 32 bits.
     end_time = (int) timestamp;
   }
@@ -167,6 +180,7 @@ final public class TsdbQuery implements Query {
                             final boolean rate) throws NoSuchUniqueName {
     findGroupBys(tags);
     this.metric = tsdb.getMetrics().getId(metric);
+    this.metricName = metric;
     this.tags = Tags.resolveAll(tsdb, tags);
     aggregator = function;
     this.rate = rate;
@@ -257,6 +271,7 @@ final public class TsdbQuery implements Query {
 
   public DataPoints[] run() throws StorageException {
     storage_query.setMetric(metric);
+    storage_query.setMetricName(metricName);
     storage_query.setScanStartTime(start_time);
     storage_query.setScanEndTime(end_time);
     storage_query.setTags(tags);
@@ -269,7 +284,30 @@ final public class TsdbQuery implements Query {
     storage_query.setSampleInterval(sample_interval);
     storage_query.setPlusAggregate(plus_aggregate);
     storage_query.setExtraTags(extra_tags);
+    storage_query.setIsAvail(isAvailability());
+    storage_query.setAvailInterval(getAvailInterval());
     return storage_query.runQuery();
+  }
+
+  private boolean isAvailability() {
+      if (null == isAvail)
+          isAvail = metricName.contains("system.uptime.availability")
+              || (metricName.contains(".avail")
+                      && (metricName.contains(".percent") || metricName.contains(".second")));
+
+      return isAvail;
+  }
+
+  private long getAvailInterval() {
+      if (null == availInterval) {
+          Matcher matcher = availPattern.matcher(metricName);
+          if (matcher.find())
+              availInterval = Long.parseLong(matcher.group(1));
+          else
+              availInterval = 3600L; 
+      }
+
+      return availInterval;
   }
 
   /** Returns the UNIX timestamp from which we must start scanning.  */

@@ -9,6 +9,7 @@ public interface StorageQuery {
     DataPoints[] runQuery() throws StorageException;
     
     void setMetric(byte[] metric);
+    void setMetricName(String metricName);
     void setScanStartTime(long start_time);
     void setScanEndTime(long end_time);
     void setTags(ArrayList<byte[]> tags);
@@ -21,5 +22,7 @@ public interface StorageQuery {
     void setSampleInterval(int sample_interval);
     void setPlusAggregate(Map<byte[], Boolean> plus_aggregate);
     void setExtraTags(Map<String, String> extra_tags);
+    void setIsAvail(Boolean isAvail);
+    void setAvailInterval(Long availInterval);
   
 }

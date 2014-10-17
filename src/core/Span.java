@@ -27,12 +27,12 @@ import org.slf4j.LoggerFactory;
  * <p>
  * This class stores a continuous sequence of {@link SpanView}s in memory.
  */
-final public class Span implements DataPoints {
+public class Span implements DataPoints {
 
   private static final Logger LOG = LoggerFactory.getLogger(Span.class);
 
   /** All the rows in this span. */
-  private List<? extends SpanView> rows;
+  private List<? extends SpanView> rows = new ArrayList<SpanView>();
 
   private void checkNotEmpty() {
     if (rows.size() == 0) {
@@ -165,7 +165,7 @@ final public class Span implements DataPoints {
   }
 
   /** Package private iterator method to access it as a Span.Iterator. */
-  Span.Iterator spanIterator() {
+  SeekableView spanIterator() {
     return new Span.Iterator();
   }
 
@@ -219,7 +219,7 @@ final public class Span implements DataPoints {
   }
 
   /** Package private iterator method to access it as a DownsamplingIterator. */
-  Span.DownsamplingIterator downsampler(final int interval,
+  SeekableView downsampler(final int interval,
                                         final Aggregator downsampler) {
     return new Span.DownsamplingIterator(interval, downsampler);
   }

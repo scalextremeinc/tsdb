@@ -58,6 +58,10 @@ tsdb_SRC := \
 	src/core/sql/DataSourceUtil.java \
 	src/core/sql/StorageQuerySql.java \
 	src/core/sql/SpanViewSql.java \
+	src/core/GapFixDataPoints.java	\
+	src/core/GapFixSpan.java	\
+	src/core/EmptySpan.java	\
+	src/core/EmptySpanUtil.java	\
 	src/graph/Plot.java	\
 	src/stats/Histogram.java	\
 	src/stats/StatsCollector.java	\

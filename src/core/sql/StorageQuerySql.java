@@ -466,5 +466,14 @@ public class StorageQuerySql implements StorageQuery {
     public void setExtraTags(Map<String, String> extra_tags) {
       this.extra_tags = extra_tags;
     }
-  
+
+    public void setIsAvail(Boolean isAvail) {
+    }
+
+    public void setAvailInterval(Long availInterval) {
+    }
+
+    public void setMetricName(String metricName) {
+    }
+
 }

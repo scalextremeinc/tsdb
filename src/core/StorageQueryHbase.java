@@ -40,6 +40,7 @@ public class StorageQueryHbase implements StorageQuery {
   
   /** ID of the metric being looked up. */
   private byte[] metric;
+  private String metricName;
   private long start_time;
   private long end_time;
   private ArrayList<byte[]> tags;
@@ -56,6 +57,9 @@ public class StorageQueryHbase implements StorageQuery {
    * Tags specified in query as tag=<empty>, this allows to query for data without particular tag.
    */
   private ArrayList<byte[]> empty_tags = new ArrayList<byte[]>();
+
+  private Boolean isAvail;
+  private Long availInterval;
 
   public StorageQueryHbase(TsdbHbase tsdb) {
       this.tsdb = tsdb;
@@ -115,6 +119,18 @@ public class StorageQueryHbase implements StorageQuery {
   
   public DataPoints[] runQuery() throws StorageException {
       return groupByAndAggregate(findSpans());
+  }
+
+  public void setIsAvail(Boolean isAvail) {
+      this.isAvail = isAvail;
+  }
+
+  public void setAvailInterval(Long availInterval) {
+      this.availInterval = availInterval;
+  }
+  
+  public void setMetricName(String metricName) {
+      this.metricName = metricName;
   }
   
   /**
@@ -240,8 +256,14 @@ public class StorageQueryHbase implements StorageQuery {
           
           Span datapoints = spans.get(key);
           if (datapoints == null) {
-            datapoints = new Span();
-            datapoints.setSpanViews(rowseqs);
+            if (isAvail) {
+              LOG.info("AVAILABILITY: initializing span gap fixer, interval: " + availInterval);
+              datapoints = new GapFixSpan(availInterval, 0.0, false, start_time, end_time); 
+              datapoints.setSpanViews(rowseqs);
+            } else {
+              datapoints = new Span();
+              datapoints.setSpanViews(rowseqs);
+            }
             spans.put(key, datapoints);
           }
           
@@ -258,6 +280,10 @@ public class StorageQueryHbase implements StorageQuery {
       scanlatency.add(hbase_time);
     }
     LOG.info(this + " matched " + nrows + " rows in " + spans.size() + " spans");
+    if (isAvail) {
+        nrows += EmptySpanUtil.insertEmptySpans(spans, tsdb, availInterval, start_time, end_time,
+                metric, metricName, tags, group_bys, group_by_values);
+    }
     if (nrows == 0) {
       return null;
     }
