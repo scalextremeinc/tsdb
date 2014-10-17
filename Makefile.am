@@ -101,7 +101,8 @@ tsdb_DEPS = \
 	$(C3P0)	\
 	$(MCHANGE_COMMONS) \
 	$(MYSQL) \
-	$(ZOOKEEPER)
+	$(ZOOKEEPER) \
+	$(PROTOBUF)
 
 # Install all the .jar files in pkgdatadir.
 pkgdata_DATA = $(tsdb_DEPS) $(jar)
