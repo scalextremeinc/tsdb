@@ -52,6 +52,11 @@ public class StorageQueryHbase implements StorageQuery {
   private Map<byte[], Boolean> plus_aggregate = new HashMap<byte[], Boolean>();
   private Map<String, String> extra_tags;
   
+  /**
+   * Tags specified in query as tag=<empty>, this allows to query for data without particular tag.
+   */
+  private ArrayList<byte[]> empty_tags = new ArrayList<byte[]>();
+
   public StorageQueryHbase(TsdbHbase tsdb) {
       this.tsdb = tsdb;
   }
@@ -72,7 +77,9 @@ public class StorageQueryHbase implements StorageQuery {
       this.tags = tags;
   }
   
-  public void setEmptyTags(ArrayList<byte[]> empty_tags) {}
+  public void setEmptyTags(ArrayList<byte[]> empty_tags) {
+      this.empty_tags = empty_tags;
+  }
   
   public void setGroupBys(ArrayList<byte[]> group_bys) {
       this.group_bys = group_bys;
@@ -212,13 +219,17 @@ public class StorageQueryHbase implements StorageQuery {
       ArrayList<ArrayList<KeyValue>> rows;
       while ((rows = scanner.nextRows().joinUninterruptibly()) != null) {
         hbase_time += (System.nanoTime() - starttime) / 1000000;
-        for (final ArrayList<KeyValue> row : rows) {
+        rowsLoop: for (final ArrayList<KeyValue> row : rows) {
           final byte[] key = row.get(0).key();
           if (Bytes.memcmp(metric, key, 0, metric_width) != 0) {
             throw new IllegalDataException("HBase returned a row that doesn't match"
                 + " our scanner (" + scanner + ")! " + row + " does not start"
                 + " with " + Arrays.toString(metric));
           }
+          // skip rows containg tags which are asked to be excluded
+          for (byte[] empty_tag : empty_tags)
+              if (Tags.hasTag(tsdb, key, empty_tag))
+                  continue rowsLoop;
 
           List<RowSeq> rowseqs = rows_map.get(key);
           if (rowseqs == null) {
