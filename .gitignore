@@ -12,7 +12,7 @@ configure
 .project
 bin
 *.class
-
+tags
 # Package Files #
 *.jar
 *.war
