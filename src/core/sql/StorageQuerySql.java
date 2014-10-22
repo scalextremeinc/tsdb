@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.TreeMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -28,6 +29,10 @@ import net.opentsdb.core.DataPoint;
 import net.opentsdb.core.DataPointImpl;
 import net.opentsdb.core.DataPoints;
 import net.opentsdb.core.Aggregator;
+import net.opentsdb.core.RowKey;
+import net.opentsdb.core.GapFixSpan;
+import net.opentsdb.core.SpanCmp;
+import net.opentsdb.core.EmptySpanUtil;
 
 public class StorageQuerySql implements StorageQuery {
     
@@ -46,6 +51,7 @@ public class StorageQuerySql implements StorageQuery {
         "t2_valueid", "t3_valueid", "t4_valueid", "t5_valueid", "t6_valueid"};
     
     private byte[] metric;
+    private String metricName;
     private long start_time;
     private long end_time;
     private ArrayList<byte[]> tags;
@@ -58,16 +64,26 @@ public class StorageQuerySql implements StorageQuery {
     private int sample_interval;
     private Map<byte[], Boolean> plus_aggregate = new HashMap<byte[], Boolean>();
     private Map<String, String> extra_tags;
+
+    private Boolean isAvail;
+    private Long availInterval;
+
+    private short metric_width;
+    private short name_width;
+    private short value_width;
   
     public StorageQuerySql(TsdbSql tsdb, DataSource ds, String table_tsdb, String table_tsdbtag) {
         this.tsdb = tsdb;
         this.ds = ds;
         this.table_tsdb = table_tsdb;
         this.table_tsdbtag = table_tsdbtag;
+        this.metric_width = tsdb.getMetrics().width();
+        this.name_width = tsdb.getTagNames().width();
+        this.value_width = tsdb.getTagValues().width();
     }
     
     public DataPoints[] runQuery() throws StorageException {
-        Map<List<Long>, Span> spans = queryDb();
+        Map<byte[], Span> spans = queryDb();
         
         if (spans == null || spans.size() <= 0) {
           return NO_RESULT;
@@ -84,8 +100,8 @@ public class StorageQuerySql implements StorageQuery {
         final ByteMap<SpanGroup> groups = new ByteMap<SpanGroup>();
         final short value_width = tsdb.getTagValues().width();
         final byte[] group = new byte[group_bys.size() * value_width];
-        for (final Map.Entry<List<Long>, Span> entry : spans.entrySet()) {
-            List<Long> key = entry.getKey();
+        for (final Map.Entry<byte[], Span> entry : spans.entrySet()) {
+            byte[] key = entry.getKey();
             byte[] value_id = null;
             int i = 0;
             for (final byte[] tag_id : group_bys) {
@@ -118,14 +134,13 @@ public class StorageQuerySql implements StorageQuery {
         return groups.values().toArray(new SpanGroup[groups.size()]);
     }
     
-    private byte[] getTagValue(List<Long> key, byte[] tag_id) {
-        Long tag_idl = DataSourceUtil.toLong(tag_id);
-        Iterator<Long> i = key.iterator();
+    private byte[] getTagValue(byte[] key, byte[] tag_id) {
+        Iterator<byte[]> i = new RowKey.TagIterator(tsdb, key);
         while (i.hasNext()) {
-            Long name_id = i.next();
-            Long value_id = i.next();
-            if (tag_idl.equals(name_id))
-                return DataSourceUtil.toBytes(value_id);
+            byte[] name = i.next();
+            byte[] value = i.next();
+            if (Arrays.equals(tag_id, name))
+                return value;
         }
         return null;
     }
@@ -306,12 +321,12 @@ public class StorageQuerySql implements StorageQuery {
         return host_name_idl;
     }
     
-    private Map<List<Long>, Span> queryDb() {
+    private Map<byte[], Span> queryDb() {
         String query = buildQuery();
         LOG.info(query);
         
-        Map<List<Long>, Span> spans = new HashMap<List<Long>, Span>();
-        Map<List<Long>, SpanViewSql> span_views = new HashMap<List<Long>, SpanViewSql>();
+        TreeMap<byte[], Span> spans = new TreeMap<byte[], Span>(new SpanCmp(metric_width));
+        Map<byte[], SpanViewSql> span_views = new HashMap<byte[], SpanViewSql>();
         
         Connection conn = null;
         PreparedStatement st = null;
@@ -328,25 +343,31 @@ public class StorageQuerySql implements StorageQuery {
         } finally {
             DataSourceUtil.close(rs, st, conn);
         }  
+
+        if (isAvail) {
+            EmptySpanUtil.insertEmptySpans(spans, tsdb, availInterval, start_time, end_time,
+                    metric, metricName, tags, group_bys, group_by_values);
+        }
         
         return spans;
     }
     
-    private void updateSpan(Map<List<Long>, Span> spans, Map<List<Long>, SpanViewSql> span_views, ResultSet rs)
+    private void updateSpan(Map<byte[], Span> spans, Map<byte[], SpanViewSql> span_views, ResultSet rs)
             throws SQLException {
         
-        List<Long> key = createKey(rs);
+        List<byte[]> tag_kvs = createTagKVs(rs);
+        byte[] key = RowKey.createRowKey(tsdb, metric, tag_kvs);
+
         DataPoint point = createPoint(rs);
-        
 
         SpanViewSql span_view = span_views.get(key);
         if (span_view == null) {
             span_view = new SpanViewSql(tsdb.getMetrics().getName(metric));
             // set tags
-            Iterator<Long> i = key.iterator();
+            Iterator<byte[]> i = new RowKey.TagIterator(tsdb, key);
             while (i.hasNext()) {
-                byte[] name_id = DataSourceUtil.toBytes(i.next());
-                Long value_id = i.next();
+                byte[] name_id = i.next();
+                byte[] value_id = i.next();;
                 // add tag to span view only if it appears in tags or groupbys
                 boolean add = false;
                 if (group_bys != null)
@@ -363,8 +384,7 @@ public class StorageQuerySql implements StorageQuery {
                     }
                 }
                 if (add)
-                    span_view.putTag(tsdb.getTagNames().getName(name_id),
-                        tsdb.getTagValues().getName(DataSourceUtil.toBytes(value_id)));
+                    span_view.putTag(tsdb.getTagNames().getName(name_id), tsdb.getTagValues().getName(value_id));
             }
             
             //String key_str = "";
@@ -375,7 +395,13 @@ public class StorageQuerySql implements StorageQuery {
             span_views.put(key, span_view);
             List<SpanViewSql> rows = new ArrayList<SpanViewSql>();
             rows.add(span_view);
-            Span s = new Span();
+            Span s = null;
+            if (isAvail) {
+              LOG.info("AVAILABILITY: initializing span gap fixer, interval: " + availInterval);
+              s = new GapFixSpan(availInterval, 0.0, false, start_time, end_time); 
+            } else {
+              s = new Span();
+            }
             s.setSpanViews(rows);
             spans.put(key, s);
         }
@@ -390,30 +416,33 @@ public class StorageQuerySql implements StorageQuery {
         else
             return new DataPointImpl(rs.getLong(3), rs.getLong(1));
     }
-    
-    private List<Long> createKey(ResultSet rs) throws SQLException {
-        List<Long> key = new LinkedList<Long>();
-         
+
+    private List<byte[]> createTagKVs(ResultSet rs) throws SQLException {
+        ArrayList<byte[]> tag_kvs = new ArrayList<byte[]>();
         for (String tagcol : tags_columns) {
             if ("hostid".equals(tagcol)) {
                 long host_value_id = rs.getLong(4);
                 if (!rs.wasNull()) {
-                    key.add(getHostIdl());
-                    key.add(host_value_id);
+                    byte[] tag_kv = new byte[name_width + value_width];
+                    System.arraycopy(getHostId(), 0, tag_kv, 0, name_width);
+                    System.arraycopy(DataSourceUtil.toBytes(host_value_id), 0, tag_kv, name_width, value_width);
+                    tag_kvs.add(tag_kv);
                 }
             } else {
                 long value_id = rs.getLong(tagcol);
                 if (!rs.wasNull()) {
                     String tag = tagcol.substring(0, 2);
-                    long tag_id = DataSourceUtil.toLong(tsdb.getTagNames().getId(tag));
-                    key.add(tag_id);
-                    key.add(value_id);
+                    byte[] tag_kv = new byte[name_width + value_width];
+                    System.arraycopy(tsdb.getTagNames().getId(tag), 0, tag_kv, 0, name_width);
+                    System.arraycopy(DataSourceUtil.toBytes(value_id), 0, tag_kv, name_width, value_width);
+                    tag_kvs.add(tag_kv);
                 }
             }
         }
-        
-        return key;
+
+        return tag_kvs;
     }
+
     
     public void setMetric(byte[] metric) {
         this.metric = metric;
@@ -468,12 +497,15 @@ public class StorageQuerySql implements StorageQuery {
     }
 
     public void setIsAvail(Boolean isAvail) {
+        this.isAvail = isAvail;
     }
 
     public void setAvailInterval(Long availInterval) {
+        this.availInterval = availInterval;
     }
 
     public void setMetricName(String metricName) {
+        this.metricName = metricName;
     }
 
 }

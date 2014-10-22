@@ -48,6 +48,7 @@ tsdb_SRC := \
 	src/core/StorageQuery.java \
 	src/core/StorageQueryHbase.java \
 	src/core/Span.java	\
+	src/core/SpanCmp.java	\
 	src/core/SpanGroup.java	\
 	src/core/TSDB.java	\
 	src/core/TsdbHbase.java	\
