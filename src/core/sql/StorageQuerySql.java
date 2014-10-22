@@ -326,7 +326,7 @@ public class StorageQuerySql implements StorageQuery {
         LOG.info(query);
         
         TreeMap<byte[], Span> spans = new TreeMap<byte[], Span>(new SpanCmp(metric_width));
-        Map<byte[], SpanViewSql> span_views = new HashMap<byte[], SpanViewSql>();
+        TreeMap<byte[], SpanViewSql> span_views = new TreeMap<byte[], SpanViewSql>(new SpanCmp(metric_width));
         
         Connection conn = null;
         PreparedStatement st = null;
