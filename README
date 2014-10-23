@@ -18,3 +18,10 @@ easily store hundreds of billions of data points.
 
 OpenTSDB is free software and is available under both LGPLv2.1+ and GPLv3+.
 Find more about OpenTSDB at http://opentsdb.net
+
+Features added:
+- plus aggregation, specify which tags to aggregate eg: tag=val1+val2
+- run queries in parallel
+- percentile aggregators
+- sql storage
+- availability gap fix and empty serie support
