@@ -387,11 +387,6 @@ public class StorageQuerySql implements StorageQuery {
                     span_view.putTag(tsdb.getTagNames().getName(name_id), tsdb.getTagValues().getName(value_id));
             }
             
-            //String key_str = "";
-            //for (Long l : key)
-            //    key_str += "_" + l;
-            //LOG.info("new span view: " + span_view + ", key: " + key_str);
-           
             span_views.put(key, span_view);
             List<SpanViewSql> rows = new ArrayList<SpanViewSql>();
             rows.add(span_view);
