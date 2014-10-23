@@ -147,7 +147,7 @@ public class StorageQueryHbase implements StorageQuery {
     if (group_bys == null) {
       // We haven't been asked to find groups, so let's put all the spans
       // together in the same group.
-      final SpanGroup group = new SpanGroup(tsdb, start_time, end_time,
+      final SpanGroup group = new SpanGroup(tsdb, getScanStartTime(), getScanEndTime(),
         spans.values(), rate, aggregator, sample_interval, downsampler);
       return new SpanGroup[] { group };
     }
@@ -194,7 +194,7 @@ public class StorageQueryHbase implements StorageQuery {
       //LOG.info("Span belongs to group " + Arrays.toString(group) + ": " + Arrays.toString(row));
       SpanGroup thegroup = groups.get(group);
       if (thegroup == null) {
-        thegroup = new SpanGroup(tsdb, start_time, end_time,
+        thegroup = new SpanGroup(tsdb, getScanStartTime(), getScanEndTime(),
             null, rate, aggregator, sample_interval, downsampler);
         thegroup.setExtraTags(extra_tags);
         // Copy the array because we're going to keep `group' and overwrite
@@ -224,11 +224,14 @@ public class StorageQueryHbase implements StorageQuery {
    */
   private TreeMap<byte[], Span> findSpans() throws StorageException {
     final short metric_width = tsdb.metrics.width();
-    final TreeMap<byte[], Span> spans =  // The key is a row key from HBase.
-      new TreeMap<byte[], Span>(new SpanCmp(metric_width));
-    final HashMap<byte[], List<RowSeq>> rows_map = new HashMap<byte[], List<RowSeq>>();
+
+    // The key is a row key from HBase
+    final TreeMap<byte[], Span> spans = new TreeMap<byte[], Span>(new SpanCmp(metric_width));
+    final TreeMap<byte[], List<RowSeq>> rows_map =
+        new TreeMap<byte[], List<RowSeq>>(new SpanCmp(metric_width));
+
     int nrows = 0;
-    int hbase_time = 0;  // milliseconds.
+    int hbase_time = 0; // milliseconds.
     long starttime = System.nanoTime();
     final Scanner scanner = getScanner();
     try {
@@ -244,8 +247,9 @@ public class StorageQueryHbase implements StorageQuery {
           }
           // skip rows containg tags which are asked to be excluded
           for (byte[] empty_tag : empty_tags)
-              if (Tags.hasTag(tsdb, key, empty_tag))
+              if (Tags.hasTag(tsdb, key, empty_tag)) {
                   continue rowsLoop;
+              }
 
           List<RowSeq> rowseqs = rows_map.get(key);
           if (rowseqs == null) {
@@ -373,10 +377,10 @@ public class StorageQueryHbase implements StorageQuery {
     // rely on having a few extra data points before & after the exact start
     // & end dates in order to do proper rate calculation or downsampling near
     // the "edges" of the graph.
-    Bytes.setInt(start_row, (int) start_time, metric_width);
+    Bytes.setInt(start_row, (int) getScanStartTime(), metric_width);
     Bytes.setInt(end_row, (end_time == TsdbQuery.UNSET
                            ? -1  // Will scan until the end (0xFFF...).
-                           : (int) end_time),
+                           : (int) getScanEndTime()),
                  metric_width);
     System.arraycopy(metric, 0, start_row, 0, metric_width);
     System.arraycopy(metric, 0, end_row, 0, metric_width);
@@ -390,6 +394,38 @@ public class StorageQueryHbase implements StorageQuery {
     scanner.setFamily(TsdbHbase.FAMILY);
     return scanner;
   }
+
+  /** Returns the UNIX timestamp from which we must start scanning.  */
+  private long getScanStartTime() {
+    // The reason we look before by `MAX_TIMESPAN * 2' seconds is because of
+    // the following.  Let's assume MAX_TIMESPAN = 600 (10 minutes) and the
+    // start_time = ... 12:31:00.  If we initialize the scanner to look
+    // only 10 minutes before, we'll start scanning at time=12:21, which will
+    // give us the row that starts at 12:30 (remember: rows are always aligned
+    // on MAX_TIMESPAN boundaries -- so in this example, on 10m boundaries).
+    // But we need to start scanning at least 1 row before, so we actually
+    // look back by twice MAX_TIMESPAN.  Only when start_time is aligned on a
+    // MAX_TIMESPAN boundary then we'll mistakenly scan back by an extra row,
+    // but this doesn't really matter.
+    // Additionally, in case our sample_interval is large, we need to look
+    // even further before/after, so use that too.
+    final long ts = start_time - Const.MAX_TIMESPAN * 2 - sample_interval;
+    return ts > 0 ? ts : 0;
+  }
+
+  /** Returns the UNIX timestamp at which we must stop scanning.  */
+  private long getScanEndTime() {
+    // For the end_time, we have a different problem.  For instance if our
+    // end_time = ... 12:30:00, we'll stop scanning when we get to 12:40, but
+    // once again we wanna try to look ahead one more row, so to avoid this
+    // problem we always add 1 second to the end_time.  Only when the end_time
+    // is of the form HH:59:59 then we will scan ahead an extra row, but once
+    // again that doesn't really matter.
+    // Additionally, in case our sample_interval is large, we need to look
+    // even further before/after, so use that too.
+    return end_time + Const.MAX_TIMESPAN + 1 + sample_interval;
+  }
+
   
   /**
    * Sets the server-side regexp filter on the scanner.
