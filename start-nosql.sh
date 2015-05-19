@@ -1,19 +1,28 @@
-CACHE_DIR="/tmp/tsdb-nosql"
+#!/bin/bash
+
+
+if [ ! -z $HBASE_PORT_2181_TCP_PORT ]; then
+    ZKQUORUM=hbase
+fi
+if [ -z $ZKQUORUM ]; then
+    echo "ZKQUORUM is unset"
+    exit 1
+fi
+
+CACHE_DIR=${CACHE_DIR:-"/tmp/tsdb-nosql"}
+TSDB_HOME=${TSDB_HOME:-.}
+export JAVA=${JAVA:-"java"}
+export JVMARGS=${JVMARGS:-"-enableassertions -enablesystemassertions -Xmx3000m"}
+
+mkdir -p $CACHE_DIR
+mkdir -p $LOG_DIR
 rm -rf $CACHE_DIR/*
 
-TSDB_DIR=.
-mkdir -p $TSDB_DIR/log
-
-DEBUG="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8002"
-
-export JAVA="java"
-export JVMARGS="-enableassertions -enablesystemassertions -Xmx3000m $DEBUG"
-
-set -x
-nohup $TSDB_DIR/build/tsdb tsd \
+nohup $TSDB_HOME/build/tsdb tsd \
  --port=4242 \
- --staticroot=$TSDB_DIR/build/staticroot \
+ --staticroot=$TSDB_HOME/build/staticroot \
  --cachedir="$CACHE_DIR" \
- --zkquorum 127.0.0.1 \
+ --zkquorum $ZKQUORUM \
  --auto-metric \
->> $TSDB_DIR/log/opentsdb-nosql.log 2>&1 &
+>> $LOG_DIR/opentsdb-nosql.log 2>&1 &
+tail -F $LOG_DIR/opentsdb-nosql.log
