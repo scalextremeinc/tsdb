@@ -1,9 +1,6 @@
-FROM centos:7
-RUN yum install -y make hostname gnuplot
+FROM docker-registry.scalextreme.com/jdk
 
-ADD third_party/jdk-7u79-linux-x64.tar.gz /opt/jdk/
-WORKDIR /opt/jdk
-RUN ln -s /opt/jdk/jdk1.7.0_79/bin/* /usr/local/sbin/
+RUN yum install -y make hostname gnuplot
 
 ADD . /opt/tsdb
 WORKDIR /opt/tsdb
