@@ -19,11 +19,9 @@ mkdir -p $CACHE_DIR
 mkdir -p $LOG_DIR
 rm -rf $CACHE_DIR/*
 
-nohup $TSDB_HOME/build/tsdb tsd \
+exec $TSDB_HOME/build/tsdb tsd \
  --port=$TSDB_PORT \
  --staticroot=$TSDB_HOME/build/staticroot \
  --cachedir="$CACHE_DIR" \
  --zkquorum $ZKQUORUM \
- --auto-metric \
->> $LOG_DIR/opentsdb-nosql.log 2>&1 &
-tail -F $LOG_DIR/opentsdb-nosql.log
+ --auto-metric
