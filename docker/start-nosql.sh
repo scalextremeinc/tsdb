@@ -19,7 +19,7 @@ if [ ! -z "$HOSTS_ENTRY" ]; then
     grep "$HOSTS_ENTRY" /etc/hosts
     if [ $? == 1 ]; then
         # this is needed to resolve dns name reported by hbase
-        echo "$HOSTS_ENTRY" >> /etc/hosts
+        echo -e "$HOSTS_ENTRY" >> /etc/hosts
     fi
 fi
 
